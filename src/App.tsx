@@ -1,0 +1,37 @@
+import { Routes, Route, Navigate } from 'react-router-dom'
+import AppLayout from './components/AppLayout'
+import Dashboard from './pages/Dashboard'
+import Inbox from './pages/Inbox'
+import ReturnDetail from './pages/ReturnDetail'
+import NewReturn from './pages/NewReturn'
+import MyPending from './pages/MyPending'
+import MassReturns from './pages/MassReturns'
+import Reports from './pages/Reports'
+import Catalogs from './pages/Catalogs'
+import Settings from './pages/Settings'
+import { useRole } from './lib/RoleContext'
+import { canSeeNav, type NavKey } from './lib/permissions'
+
+/** Renderiza el elemento solo si el rol activo tiene acceso al módulo; si no, redirige al Dashboard. */
+function Guard({ nav, children }: { nav: NavKey; children: React.ReactNode }) {
+  const { role } = useRole()
+  return canSeeNav(role, nav) ? <>{children}</> : <Navigate to="/" replace />
+}
+
+export default function App() {
+  return (
+    <AppLayout>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/devoluciones" element={<Guard nav="devoluciones"><Inbox /></Guard>} />
+        <Route path="/devoluciones/:folio" element={<Guard nav="devoluciones"><ReturnDetail /></Guard>} />
+        <Route path="/nueva" element={<Guard nav="nueva"><NewReturn /></Guard>} />
+        <Route path="/pendientes" element={<Guard nav="pendientes"><MyPending /></Guard>} />
+        <Route path="/masivas" element={<Guard nav="masivas"><MassReturns /></Guard>} />
+        <Route path="/reportes" element={<Guard nav="reportes"><Reports /></Guard>} />
+        <Route path="/catalogos" element={<Guard nav="catalogos"><Catalogs /></Guard>} />
+        <Route path="/configuracion" element={<Guard nav="configuracion"><Settings /></Guard>} />
+      </Routes>
+    </AppLayout>
+  )
+}
