@@ -46,7 +46,7 @@ export default function Reports() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <SectionTitle>Devoluciones por proveedor</SectionTitle>
-          <div className="h-64">
+          <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={byProveedor} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -61,7 +61,7 @@ export default function Reports() {
 
         <Card>
           <SectionTitle>Devoluciones por marca</SectionTitle>
-          <div className="h-64">
+          <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={byMarca} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -76,7 +76,7 @@ export default function Reports() {
 
         <Card>
           <SectionTitle>Distribución por tipo</SectionTitle>
-          <div className="h-64">
+          <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={byType} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={85}>
@@ -91,7 +91,7 @@ export default function Reports() {
 
         <Card>
           <SectionTitle>Motivos más frecuentes</SectionTitle>
-          <div className="h-64">
+          <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={byMotivo} layout="vertical" margin={{ top: 0, right: 12, left: 8, bottom: 0 }}>
                 <XAxis type="number" hide />

@@ -25,23 +25,52 @@ import {
   Building2,
   ArrowRight,
   Lock,
+  UserSquare2,
+  Boxes,
+  Gavel,
+  Layers,
 } from 'lucide-react'
 import { Card, SectionTitle, StatusBadge, PriorityBadge, Avatar, Button, cn } from '../lib/ui'
 import {
   findReturn,
   personById,
+  compradorForMarca,
+  existenciasFor,
+  RESOLUTIONS,
   RETURN_TYPES,
   type Comment,
+  type ResolutionKey,
+  type StatusKey,
   type TimelineEvent,
 } from '../data/mock'
 import { useRole } from '../lib/RoleContext'
-import { allowedActions, ownershipFor, canSeeCost, type ActionKey } from '../lib/permissions'
+import { allowedActions, ownershipFor, canSeeCost, needsResolution, type ActionKey } from '../lib/permissions'
+
+// Motivos de rechazo (Compras debe elegir uno al rechazar).
+const REJECT_REASONS = [
+  'Fuera de política de devolución',
+  'Daño por mal uso',
+  'Producto sin defecto detectado',
+  'Fuera de tiempo',
+  'Evidencia insuficiente',
+  'Expediente duplicado',
+]
 
 function InfoRow({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
     <div className="flex items-start justify-between gap-4 py-2">
       <span className="text-sm text-slate-500">{label}</span>
       <span className={cn('text-right text-sm font-medium text-slate-900', mono && 'font-mono text-xs')}>{value}</span>
+    </div>
+  )
+}
+
+/** Par etiqueta/valor apilado y compacto — para rejillas de 2 columnas. */
+function Meta({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[11px] text-slate-400">{label}</div>
+      <div className={cn('truncate text-sm font-medium text-slate-900', mono && 'font-mono text-xs')}>{value}</div>
     </div>
   )
 }
@@ -89,6 +118,15 @@ export default function ReturnDetail() {
   const [comments, setComments] = useState<Comment[]>(data?.comments ?? [])
   const [draft, setDraft] = useState('')
   const [preview, setPreview] = useState<string | null>(null)
+  const [resolucion, setResolucion] = useState<ResolutionKey | ''>(data?.resolucion ?? '')
+  const [showResPicker, setShowResPicker] = useState(false)
+  // Estatus reactivo (prototipo): las acciones lo cambian y se refleja en la UI.
+  const [status, setStatus] = useState<StatusKey>(data?.status ?? 'nuevo')
+  const [events, setEvents] = useState<TimelineEvent[]>(data?.timeline ?? [])
+  const [banner, setBanner] = useState<{ kind: 'success' | 'danger' | 'info'; text: string } | null>(null)
+  const [rejectOpen, setRejectOpen] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
+  const [pendingAfterRes, setPendingAfterRes] = useState<ActionKey | null>(null)
 
   if (!data) {
     return (
@@ -101,11 +139,79 @@ export default function ReturnDetail() {
 
   const resp = personById(data.responsableId)
   const creador = personById(data.creadorId)
-  const own = ownershipFor(data.status)
-  const actions = allowedActions(role, data.status, data.tipo)
+  const own = ownershipFor(status)
+  const actions = allowedActions(role, status, data.tipo)
   const showCost = canSeeCost(role)
   const canComment = actions.includes('comentar')
   const barActions = ACTION_ORDER.filter((a) => actions.includes(a) && ACTION_META[a])
+  const comprador = compradorForMarca(data.marca)
+  const existencias = existenciasFor(data.lote)
+  const requiereResolucion = needsResolution(data.tipo)
+
+  function logEvent(text: string, kind: TimelineEvent['kind']) {
+    setEvents((e) => [...e, { date: 'Hoy', time: 'ahora', actor: user.name, text, kind }])
+  }
+
+  function transition(next: StatusKey, text: string, kind: 'success' | 'danger' | 'info', msg: string) {
+    setStatus(next)
+    logEvent(text, kind === 'success' ? 'status' : kind === 'danger' ? 'status' : 'comment')
+    setBanner({ kind, text: msg })
+  }
+
+  function applyAction(a: ActionKey) {
+    switch (a) {
+      case 'autorizar':
+        if (requiereResolucion && !resolucion) { setPendingAfterRes('autorizar'); setShowResPicker(true); return }
+        if (requiereResolucion) {
+          // Cliente: la resolución cierra el expediente (más ágil, sin "pendiente de cerrar").
+          transition('cerrado', `autorizó y resolvió — ${RESOLUTIONS[resolucion as ResolutionKey]}`, 'success',
+            `Devolución resuelta y cerrada · ${RESOLUTIONS[resolucion as ResolutionKey]}`)
+        } else {
+          transition('autorizado', 'autorizó la devolución', 'success', 'Devolución autorizada')
+        }
+        break
+      case 'rechazar':
+        setRejectOpen(true)
+        break
+      case 'solicitar_info':
+        transition('esperando', 'solicitó más información', 'info', 'Se solicitó información a la sucursal')
+        break
+      case 'responder_info':
+        transition('revision', 'respondió a la solicitud de información', 'info', 'Información enviada a Compras')
+        break
+      case 'tomar':
+        transition('revision', 'registró y envió a revisión', 'info', 'Expediente enviado a revisión de Compras')
+        break
+      case 'generar_traslado':
+        transition('transito', 'generó la devolución a proveedor', 'info', 'Devolución a proveedor generada')
+        break
+      case 'cerrar':
+        if (requiereResolucion && !resolucion) { setPendingAfterRes('cerrar'); setShowResPicker(true); return }
+        transition('cerrado', 'cerró el expediente', 'success', 'Expediente cerrado')
+        break
+      case 'imprimir':
+        setBanner({ kind: 'info', text: 'Enviando expediente a impresión…' })
+        break
+    }
+  }
+
+  function pickResolution(k: ResolutionKey) {
+    setResolucion(k)
+    setShowResPicker(false)
+    const pending = pendingAfterRes
+    setPendingAfterRes(null)
+    if (pending === 'autorizar') {
+      transition('cerrado', `autorizó y resolvió — ${RESOLUTIONS[k]}`, 'success', `Devolución resuelta y cerrada · ${RESOLUTIONS[k]}`)
+    } else if (pending === 'cerrar') {
+      transition('cerrado', 'cerró el expediente', 'success', 'Expediente cerrado')
+    }
+  }
+
+  function confirmReject() {
+    if (!rejectReason) return
+    transition('rechazado', `rechazó la devolución — ${rejectReason}`, 'danger', `Devolución rechazada · ${rejectReason}`)
+    setRejectOpen(false)
+  }
 
   function send() {
     if (!draft.trim()) return
@@ -117,41 +223,73 @@ export default function ReturnDetail() {
   }
 
   return (
-    <div className="pb-24">
+    <div className="pb-10">
       {/* Sticky header */}
       <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto max-w-[1400px] px-4 py-4 lg:px-8">
           <button onClick={() => navigate(-1)} className="mb-3 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900">
             <ChevronLeft className="h-4 w-4" /> Volver
           </button>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="font-mono text-2xl font-semibold tracking-tight text-slate-900">{data.folio}</h1>
-                <StatusBadge status={data.status} />
-                <PriorityBadge priority={data.priority} />
-                {data.outOfSla && (
-                  <span className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700">Fuera de SLA</span>
-                )}
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500">
-                <span>{RETURN_TYPES[data.tipo].label}</span>
-                <span className="text-slate-300">·</span>
-                <span>{data.sucursal}</span>
-                <span className="text-slate-300">·</span>
-                <span className="flex items-center gap-1.5">
-                  Responsable: <Avatar person={resp} size="sm" /> {resp.name}
-                </span>
-              </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="font-mono text-2xl font-semibold tracking-tight text-slate-900">{data.folio}</h1>
+              <StatusBadge status={status} />
+              <PriorityBadge priority={data.priority} />
+              {data.outOfSla && (
+                <span className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700">Fuera de SLA</span>
+              )}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500">
+              <span>{RETURN_TYPES[data.tipo].label}</span>
+              <span className="text-slate-300">·</span>
+              <span>{data.sucursal}</span>
+              <span className="text-slate-300">·</span>
+              <span className="flex items-center gap-1.5">
+                Responsable: <Avatar person={resp} size="sm" /> {resp.name}
+              </span>
             </div>
           </div>
+
+          {/* Barra de acciones — fija en el encabezado, siempre visible arriba */}
+          {barActions.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+              {barActions.map((a) => {
+                const m = ACTION_META[a]!
+                return (
+                  <Button key={a} variant={m.variant} icon={m.icon} onClick={() => applyAction(a)}>
+                    {m.label}
+                  </Button>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
 
+      {/* Aviso de resultado — fijo hasta la siguiente acción; se puede cerrar con la X */}
+      {banner && (
+        <div className="mx-auto max-w-[1400px] px-4 pt-4 lg:px-8">
+          <div
+            className={cn(
+              'flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium',
+              banner.kind === 'success' && 'border-emerald-200 bg-emerald-50 text-emerald-700',
+              banner.kind === 'danger' && 'border-rose-200 bg-rose-50 text-rose-700',
+              banner.kind === 'info' && 'border-sky-200 bg-sky-50 text-sky-700',
+            )}
+          >
+            {banner.kind === 'success' ? <Check className="h-4 w-4" /> : banner.kind === 'danger' ? <X className="h-4 w-4" /> : <Info className="h-4 w-4" />}
+            <span className="flex-1">{banner.text}</span>
+            <button onClick={() => setBanner(null)} className="rounded-md p-1 hover:bg-black/5" aria-label="Cerrar aviso">
+              <X className="h-4 w-4 opacity-60" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto max-w-[1400px] px-4 py-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {/* Left / main column */}
-          <div className="space-y-5 lg:col-span-2">
+          <div className="space-y-4 lg:col-span-2">
             {/* Product */}
             <Card>
               <SectionTitle icon={<Package className="h-4 w-4" />}>Producto</SectionTitle>
@@ -231,6 +369,47 @@ export default function ReturnDetail() {
               )}
             </Card>
 
+            {/* Subproductos — depuración masiva (cada producto con SKU, motivo y evidencia) */}
+            {data.subproductos && data.subproductos.length > 0 && (
+              <Card>
+                <SectionTitle
+                  icon={<Layers className="h-4 w-4" />}
+                  right={<span className="text-xs text-slate-400">{data.subproductos.length} productos</span>}
+                >
+                  Productos del expediente
+                </SectionTitle>
+                <div className="space-y-2">
+                  {data.subproductos.map((sp, i) => {
+                    const completo = sp.sku && sp.motivo && sp.evidencia
+                    return (
+                      <div key={i} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+                        <img src={sp.image} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-semibold text-slate-900">{sp.sku}</span>
+                            <span className="text-xs text-slate-400">·</span>
+                            <span className="truncate text-sm text-slate-600">{sp.descripcion}</span>
+                          </div>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                            <span>Motivo: {sp.motivo}</span>
+                            {sp.evidencia && <span className="flex items-center gap-1"><ImageIcon className="h-3 w-3" /> {sp.evidencia}</span>}
+                          </div>
+                        </div>
+                        {completo ? (
+                          <Check className="h-4 w-4 text-emerald-500" />
+                        ) : (
+                          <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold text-brand-600">Incompleto</span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+                <p className="mt-3 text-xs text-slate-400">
+                  El expediente no puede cerrarse mientras exista un producto sin SKU, motivo o evidencia fotográfica.
+                </p>
+              </Card>
+            )}
+
             {/* Comments — internal chat */}
             <Card padded={false}>
               <div className="px-5 pt-5">
@@ -295,7 +474,7 @@ export default function ReturnDetail() {
           </div>
 
           {/* Right column */}
-          <div className="space-y-5">
+          <div className="space-y-4">
             {/* Ownership */}
             <Card>
               <SectionTitle icon={<ClipboardCheck className="h-4 w-4" />}>Ownership del expediente</SectionTitle>
@@ -319,7 +498,7 @@ export default function ReturnDetail() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-lg border border-slate-100 px-3 py-2">
                     <div className="text-[11px] text-slate-400">Fecha compromiso</div>
-                    <div className="text-sm font-medium text-slate-900">{data.status === 'cerrado' || data.status === 'rechazado' ? '—' : '08 jul · 14:00'}</div>
+                    <div className="text-sm font-medium text-slate-900">{status === 'cerrado' || status === 'rechazado' ? '—' : '08 jul · 14:00'}</div>
                   </div>
                   <div className={cn('rounded-lg border px-3 py-2', data.outOfSla ? 'border-brand-100 bg-brand-50/50' : 'border-slate-100')}>
                     <div className="text-[11px] text-slate-400">SLA restante</div>
@@ -331,39 +510,125 @@ export default function ReturnDetail() {
               </div>
             </Card>
 
-            {/* AI insight */}
-            <Card className="border-brand-100 bg-brand-50/40">
-              <div className="flex items-start gap-3">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-white">
-                  <Sparkles className="h-4 w-4" />
-                </span>
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-900">Inteligencia del sistema</h4>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                    El lote <span className="font-mono font-medium">{data.lote}</span> presenta una incidencia superior al promedio.
-                    Se detectaron <span className="font-medium text-brand-700">3 casos similares</span> este mes.
-                    Recomendación a Compras: revisar calidad con el proveedor.
-                  </p>
-                  <Link to="/reportes" className="mt-2 inline-block text-xs font-medium text-brand-600 hover:underline">Ver casos similares →</Link>
+            {/* Comprador responsable — asignación automática por marca/línea (compacto) */}
+            {comprador && (
+              <Card>
+                <SectionTitle icon={<UserSquare2 className="h-4 w-4" />}>Comprador responsable</SectionTitle>
+                <div className="flex items-center gap-3">
+                  <Avatar person={comprador.comprador} size="md" />
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-slate-900">{comprador.comprador.name}</div>
+                    <div className="truncate text-xs text-slate-500">
+                      {comprador.linea} · {comprador.marca} · {comprador.proveedor}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {/* Existencias — globales y por sucursal */}
+            <Card>
+              <SectionTitle icon={<Boxes className="h-4 w-4" />} right={<span className="font-mono text-xs text-slate-400">{data.lote}</span>}>
+                Existencias
+              </SectionTitle>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg border border-slate-100 px-3 py-2">
+                  <div className="text-[11px] text-slate-400">Total</div>
+                  <div className="text-lg font-semibold text-slate-900">{existencias.total}</div>
+                </div>
+                <div className="rounded-lg border border-slate-100 px-3 py-2">
+                  <div className="text-[11px] text-slate-400">Disponible</div>
+                  <div className="text-lg font-semibold text-emerald-600">{existencias.disponible}</div>
+                </div>
+                <div className="rounded-lg border border-slate-100 px-3 py-2">
+                  <div className="text-[11px] text-slate-400">En tránsito</div>
+                  <div className="text-lg font-semibold text-indigo-600">{existencias.transito}</div>
+                </div>
+                <div className="rounded-lg border border-slate-100 px-3 py-2">
+                  <div className="text-[11px] text-slate-400">Comprometida</div>
+                  <div className="text-lg font-semibold text-amber-600">{existencias.comprometida}</div>
                 </div>
               </div>
+              <div className="mt-3 overflow-hidden rounded-xl border border-slate-100">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-medium text-slate-500">
+                      <th className="px-3 py-2">Sucursal</th>
+                      <th className="px-3 py-2 text-right">Existencia</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {existencias.porSucursal.map((e) => (
+                      <tr key={e.sucursal} className="border-b border-slate-50 last:border-0">
+                        <td className="px-3 py-2 text-slate-600">{e.sucursal}</td>
+                        <td className="px-3 py-2 text-right font-medium text-slate-900">{e.cantidad}</td>
+                      </tr>
+                    ))}
+                    <tr className="bg-slate-50/60">
+                      <td className="px-3 py-2 text-xs font-semibold text-slate-500">Total</td>
+                      <td className="px-3 py-2 text-right text-xs font-semibold text-slate-900">{existencias.total}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </Card>
+
+            {/* Resolución — solo devoluciones de cliente */}
+            {requiereResolucion && (
+              <Card className={cn(!resolucion && 'border-amber-200 bg-amber-50/40')}>
+                <SectionTitle icon={<Gavel className="h-4 w-4" />}>Resolución</SectionTitle>
+                {resolucion ? (
+                  <div className="flex items-center justify-between gap-3 rounded-lg bg-emerald-50 px-3 py-2.5">
+                    <span className="flex items-center gap-2 text-sm font-medium text-emerald-700">
+                      <Check className="h-4 w-4" /> {RESOLUTIONS[resolucion]}
+                    </span>
+                    {role === 'compras' && status !== 'cerrado' && (
+                      <button onClick={() => setShowResPicker(true)} className="text-xs font-medium text-slate-500 hover:text-slate-800">Cambiar</button>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-sm text-slate-500">
+                      Esta devolución de cliente requiere una resolución para poder autorizarse y cerrarse.
+                    </p>
+                    {role === 'compras' && (
+                      <Button className="mt-3" size="sm" variant="primary" icon={<Gavel className="h-4 w-4" />} onClick={() => setShowResPicker(true)}>
+                        Seleccionar resolución
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {/* AI insight — nota compacta */}
+            <div className="flex items-start gap-2.5 rounded-xl border border-brand-100 bg-brand-50/40 px-3 py-2.5">
+              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
+              <p className="text-xs leading-relaxed text-slate-600">
+                El lote <span className="font-mono font-medium">{data.lote}</span> tiene incidencia sobre el promedio · <span className="font-medium text-brand-700">3 casos similares</span> este mes.
+                <Link to="/reportes" className="ml-1 font-medium text-brand-600 hover:underline">Ver →</Link>
+              </p>
+            </div>
 
             {/* General info */}
             <Card>
               <SectionTitle icon={<Info className="h-4 w-4" />}>Información general</SectionTitle>
-              <div className="divide-y divide-slate-50">
-                <InfoRow label="Cliente" value={data.cliente} />
-                {data.clienteEmail && <InfoRow label="Correo" value={data.clienteEmail} />}
-                <InfoRow label="Factura" value={data.factura} mono />
-                <InfoRow label="Fecha de compra" value={data.fechaCompra} />
-                <InfoRow label="Sucursal" value={data.sucursal} />
-                <InfoRow label="Marca" value={data.marca} />
-                <InfoRow label="Proveedor" value={data.proveedor} />
-                <InfoRow label="Categoría" value={data.categoria} />
-                <InfoRow label="Lote" value={data.lote} mono />
-                <InfoRow label="Motivo" value={data.motivo} />
-                <InfoRow label="SLA" value={<span className={cn(data.outOfSla ? 'text-brand-600' : 'text-slate-900')}>{data.slaDue}</span>} />
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                <Meta label="Cliente" value={data.cliente} />
+                {data.tipo === 'ecommerce' ? (
+                  <Meta label="ID de Venta" value={data.idVenta ?? data.factura} mono />
+                ) : (
+                  <Meta label="Factura" value={data.factura} mono />
+                )}
+                <Meta label="Fecha de compra" value={data.fechaCompra} />
+                <Meta label="Sucursal" value={data.sucursal} />
+                <Meta label="Marca" value={data.marca} />
+                <Meta label="Proveedor" value={data.proveedor} />
+                <Meta label="Categoría" value={data.categoria} />
+                <Meta label="Lote" value={data.lote} mono />
+                <Meta label="Motivo" value={data.motivo} />
+                <Meta label="SLA" value={<span className={cn(data.outOfSla ? 'text-brand-600' : 'text-slate-900')}>{data.slaDue}</span>} />
+                {data.clienteEmail && <Meta label="Correo" value={data.clienteEmail} />}
               </div>
             </Card>
 
@@ -386,7 +651,7 @@ export default function ReturnDetail() {
             <Card>
               <SectionTitle icon={<History className="h-4 w-4" />}>Historial</SectionTitle>
               <ol className="relative space-y-4 border-l border-slate-200 pl-5">
-                {data.timeline.map((t, i) => (
+                {events.map((t, i) => (
                   <li key={i} className="relative">
                     <span className={cn('absolute -left-[26px] top-1 h-3 w-3 rounded-full ring-4 ring-white', TIMELINE_DOT[t.kind])} />
                     <div className="flex items-baseline gap-2">
@@ -408,38 +673,72 @@ export default function ReturnDetail() {
         </div>
       </div>
 
-      {/* Fixed action bar — solo acciones relevantes al rol × estado × tipo */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 backdrop-blur lg:pl-64">
-        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3 px-4 py-3 lg:px-8">
-          <span className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
-            Expediente <span className="font-mono font-medium text-slate-900">{data.folio}</span>
-            <span className="text-slate-300">·</span>
-            <span className="text-slate-400">Tu rol: {user.role}</span>
-          </span>
-          <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
-            {barActions.length === 0 ? (
-              <span className="flex items-center gap-1.5 text-xs text-slate-400">
-                <Lock className="h-3.5 w-3.5" />
-                Sin acciones para tu rol en este estado
-              </span>
-            ) : (
-              barActions.map((a) => {
-                const m = ACTION_META[a]!
-                return (
-                  <Button key={a} variant={m.variant} icon={m.icon}>
-                    {m.label}
-                  </Button>
-                )
-              })
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Image lightbox */}
       {preview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-6" onClick={() => setPreview(null)}>
           <img src={preview} alt="" className="max-h-[85vh] max-w-[85vw] rounded-2xl object-contain shadow-pop" />
+        </div>
+      )}
+
+      {/* Selector de resolución (cliente) */}
+      {showResPicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-6" onClick={() => setShowResPicker(false)}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-pop" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2">
+              <Gavel className="h-5 w-5 text-brand-600" />
+              <h3 className="text-base font-semibold text-slate-900">Selecciona la resolución</h3>
+            </div>
+            <p className="mt-1 text-sm text-slate-500">Obligatoria para autorizar y cerrar una devolución de cliente.</p>
+            <div className="mt-4 space-y-2">
+              {(Object.keys(RESOLUTIONS) as ResolutionKey[]).map((k) => (
+                <button
+                  key={k}
+                  onClick={() => pickResolution(k)}
+                  className={cn(
+                    'flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm hover:border-brand-300 hover:bg-brand-50/40',
+                    resolucion === k ? 'border-brand-300 bg-brand-50 font-medium text-brand-700' : 'border-slate-200 text-slate-700',
+                  )}
+                >
+                  {RESOLUTIONS[k]}
+                  {resolucion === k && <Check className="h-4 w-4 text-brand-600" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Motivo de rechazo */}
+      {rejectOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-6" onClick={() => setRejectOpen(false)}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-pop" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2">
+              <X className="h-5 w-5 text-rose-600" />
+              <h3 className="text-base font-semibold text-slate-900">Motivo del rechazo</h3>
+            </div>
+            <p className="mt-1 text-sm text-slate-500">Selecciona el motivo por el que se rechaza esta devolución.</p>
+            <div className="mt-4 space-y-2">
+              {REJECT_REASONS.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setRejectReason(r)}
+                  className={cn(
+                    'flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm hover:border-rose-300 hover:bg-rose-50/40',
+                    rejectReason === r ? 'border-rose-300 bg-rose-50 font-medium text-rose-700' : 'border-slate-200 text-slate-700',
+                  )}
+                >
+                  {r}
+                  {rejectReason === r && <Check className="h-4 w-4 text-rose-600" />}
+                </button>
+              ))}
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setRejectOpen(false)}>Cancelar</Button>
+              <Button variant="danger" icon={<X className="h-4 w-4" />} disabled={!rejectReason} onClick={confirmReject}>
+                Rechazar devolución
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -15,9 +15,6 @@ import {
   Legend,
 } from 'recharts'
 import {
-  Package,
-  Clock,
-  CheckCircle2,
   XCircle,
   Timer,
   AlertTriangle,
@@ -30,17 +27,21 @@ import {
   Truck,
   MessageSquareReply,
   Search,
+  Layers,
+  History,
 } from 'lucide-react'
 import { PageHeader } from '../components/AppLayout'
 import { Card, KpiCard, SectionTitle, StatusBadge, Avatar, Button, cn } from '../lib/ui'
 import {
-  KPIS,
-  byType,
-  bySucursal,
+  byProducto,
+  byProveedor,
+  byMarca,
   byMotivo,
-  trend,
+  byComprador,
+  autorizacionesTrend,
   topLotes,
   CHART_COLORS,
+  COMPRAS_KPIS,
   RETURNS,
   personById,
   RETURN_TYPES,
@@ -64,8 +65,82 @@ function ChartCard({ title, children, hint }: { title: string; children: React.R
   return (
     <Card>
       <SectionTitle right={hint ? <span className="text-xs text-slate-400">{hint}</span> : undefined}>{title}</SectionTitle>
-      <div className="h-56">{children}</div>
+      <div className="h-60">{children}</div>
     </Card>
+  )
+}
+
+function HBarChart({ title, data, color, hint }: { title: string; data: { name: string; value: number }[]; color: string; hint?: string }) {
+  return (
+    <ChartCard title={title} hint={hint}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} layout="vertical" margin={{ top: 0, right: 12, left: 8, bottom: 0 }}>
+          <XAxis type="number" hide />
+          <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} width={120} />
+          <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#f8fafc' }} />
+          <Bar dataKey="value" fill={color} radius={[0, 6, 6, 0]} barSize={14} name="Casos" />
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartCard>
+  )
+}
+
+/** Barras verticales — para comparativos de categorías (proveedores, marcas). */
+function VBarChart({ title, data, color, hint }: { title: string; data: { name: string; value: number }[]; color: string; hint?: string }) {
+  return (
+    <ChartCard title={title} hint={hint}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+          <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} interval={0} angle={-12} textAnchor="end" height={44} />
+          <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+          <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#f8fafc' }} />
+          <Bar dataKey="value" fill={color} radius={[6, 6, 0, 0]} barSize={26} name="Devoluciones" />
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartCard>
+  )
+}
+
+/** Pastel (pie) — para composición (motivos más frecuentes). */
+function PieChartCard({ title, data, hint }: { title: string; data: { name: string; value: number }[]; hint?: string }) {
+  return (
+    <ChartCard title={title} hint={hint}>
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+          <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="46%" outerRadius="72%" paddingAngle={1}>
+            {data.map((_, i) => (
+              <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip contentStyle={tooltipStyle} />
+          <Legend iconType="circle" verticalAlign="bottom" height={24} wrapperStyle={{ fontSize: 11 }} />
+        </PieChart>
+      </ResponsiveContainer>
+    </ChartCard>
+  )
+}
+
+/** Área — serie temporal (autorizaciones por día). */
+function AreaTrend({ title, data, hint }: { title: string; data: { name: string; value: number }[]; hint?: string }) {
+  return (
+    <ChartCard title={title} hint={hint}>
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+          <defs>
+            <linearGradient id="autoriz" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#10b981" stopOpacity={0.25} />
+              <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+          <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+          <Tooltip contentStyle={tooltipStyle} />
+          <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2.5} fill="url(#autoriz)" name="Autorizaciones" />
+        </AreaChart>
+      </ResponsiveContainer>
+    </ChartCard>
   )
 }
 
@@ -133,7 +208,7 @@ function CaseListCard({
   )
 }
 
-/** Tabla de lotes/proveedor con mayor incidencia (dato comercial). */
+/** Tabla de lotes con mayor incidencia (análisis operativo de Compras). */
 function LotesCard() {
   const navigate = useNavigate()
   return (
@@ -174,80 +249,51 @@ function LotesCard() {
   )
 }
 
-// --- Gráficas factorizadas ---
+/** Feed de actividad reciente — "lo que ha pasado" en los expedientes. */
+const ACTIVITY_DOT: Record<string, string> = {
+  create: 'bg-brand-600',
+  attach: 'bg-sky-500',
+  comment: 'bg-amber-500',
+  status: 'bg-emerald-500',
+  transfer: 'bg-violet-500',
+  receive: 'bg-teal-500',
+}
 
-function TrendChart() {
+function RecentActivity({ cases }: { cases: ReturnCase[] }) {
+  const navigate = useNavigate()
+  const items = cases.slice(0, 7).map((r) => ({ ev: r.timeline[r.timeline.length - 1], folio: r.folio }))
+  if (items.length === 0) return null
   return (
-    <ChartCard title="Tendencia mensual" hint="Últimos 7 meses">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={trend} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-          <defs>
-            <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#D32F2F" stopOpacity={0.25} />
-              <stop offset="100%" stopColor="#D32F2F" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-          <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-          <Tooltip contentStyle={tooltipStyle} />
-          <Area type="monotone" dataKey="value" stroke="#D32F2F" strokeWidth={2.5} fill="url(#g1)" name="Devoluciones" />
-        </AreaChart>
-      </ResponsiveContainer>
-    </ChartCard>
+    <Card padded={false}>
+      <div className="px-5 py-4">
+        <SectionTitle icon={<History className="h-4 w-4" />}>Actividad reciente</SectionTitle>
+      </div>
+      <div className="divide-y divide-slate-50 border-t border-slate-100">
+        {items.map(({ ev, folio }) => (
+          <button
+            key={folio}
+            onClick={() => navigate(`/devoluciones/${folio}`)}
+            className="flex w-full items-start gap-3 px-5 py-3 text-left hover:bg-slate-50"
+          >
+            <span className={cn('mt-1.5 h-2 w-2 shrink-0 rounded-full', ACTIVITY_DOT[ev.kind])} />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-slate-600">
+                <span className="font-medium text-slate-900">{ev.actor}</span> {ev.text}
+              </p>
+              <div className="mt-0.5 flex items-center gap-2 text-[11px] text-slate-400">
+                <span className="font-mono font-medium text-slate-500">{folio}</span>
+                <span>·</span>
+                <span>{ev.date} · {ev.time}</span>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </Card>
   )
 }
 
-function TypePie() {
-  return (
-    <ChartCard title="Devoluciones por tipo">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie data={byType} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={2}>
-            {byType.map((_, i) => (
-              <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip contentStyle={tooltipStyle} />
-          <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-        </PieChart>
-      </ResponsiveContainer>
-    </ChartCard>
-  )
-}
-
-function HBarChart({ title, data, color, hint }: { title: string; data: { name: string; value: number }[]; color: string; hint?: string }) {
-  return (
-    <ChartCard title={title} hint={hint}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ top: 0, right: 12, left: 8, bottom: 0 }}>
-          <XAxis type="number" hide />
-          <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} width={110} />
-          <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#f8fafc' }} />
-          <Bar dataKey="value" fill={color} radius={[0, 6, 6, 0]} barSize={14} name="Casos" />
-        </BarChart>
-      </ResponsiveContainer>
-    </ChartCard>
-  )
-}
-
-function SucursalChart() {
-  return (
-    <ChartCard title="Comparativo por sucursal">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={bySucursal} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-          <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} interval={0} angle={-12} textAnchor="end" height={44} />
-          <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-          <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#f8fafc' }} />
-          <Bar dataKey="value" fill="#D32F2F" radius={[6, 6, 0, 0]} barSize={26} name="Devoluciones" />
-        </BarChart>
-      </ResponsiveContainer>
-    </ChartCard>
-  )
-}
-
-/** Tarjeta de acción del portal de Tienda — grande, con icono, descripción y badge opcional. */
+/** Tarjeta de acción del portal de Tienda / Ecommerce — grande, con badge opcional. */
 function ActionCard({
   title,
   desc,
@@ -268,9 +314,7 @@ function ActionCard({
       onClick={onClick}
       className={cn(
         'group relative flex flex-col gap-3 rounded-2xl border p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-md',
-        primary
-          ? 'border-brand-200 bg-brand-50 hover:bg-brand-100'
-          : 'border-slate-200 bg-white hover:bg-slate-50',
+        primary ? 'border-brand-200 bg-brand-50 hover:bg-brand-100' : 'border-slate-200 bg-white hover:bg-slate-50',
       )}
     >
       <div className="flex items-center justify-between">
@@ -303,116 +347,70 @@ function ActionCard({
 }
 
 // ---------------------------------------------------------------------------
-// Portal de TIENDA (sucursal).
-// NO es un dashboard tipo ERP: es un portal operativo simplificado, sin barra
-// lateral. Las acciones principales viven en tarjetas grandes; debajo, el
-// seguimiento de sus expedientes. Pensado para usarse sin capacitación.
+// Portal operativo de TIENDA / ECOMMERCE — sin ERP, enfocado en operación.
+// Vistas: Nueva devolución · Mis devoluciones · Pendientes de información ·
+// Casos en tránsito · Casos rechazados.
 // ---------------------------------------------------------------------------
 
-function TiendaPortal() {
+function OperationalPortal({ channel }: { channel: 'tienda' | 'ecommerce' }) {
   const navigate = useNavigate()
-  const { user } = useRole()
+  const { user, role } = useRole()
 
-  // Alcance: expedientes de su sucursal o creados por él/ella.
   const sucursal = user.role.includes('·') ? user.role.split('·')[1].trim() : ''
   const firstName = user.name.split(' ')[0]
-  const mine = RETURNS.filter((r) => r.sucursal === sucursal || r.creadorId === user.id)
+  // Ecommerce ve los expedientes del canal en línea; Tienda los de su sucursal.
+  const mine =
+    channel === 'ecommerce'
+      ? RETURNS.filter((r) => r.tipo === 'ecommerce')
+      : RETURNS.filter((r) => r.sucursal === sucursal || r.creadorId === user.id)
 
-  const pendientes = mine.filter((r) => requiresActionFrom('tienda', r))
-  const solicitudes = mine.filter((r) => r.status === 'esperando')
-  const autorizadas = mine.filter((r) => r.status === 'autorizado' || r.status === 'pendiente_traslado')
+  const pendientes = mine.filter((r) => requiresActionFrom(role, r))
+  const infoPend = mine.filter((r) => r.status === 'esperando')
   const enTransito = mine.filter((r) => r.status === 'transito' || r.status === 'recibido')
   const rechazadas = mine.filter((r) => r.status === 'rechazado')
 
-  const scrollToSolicitudes = () =>
-    document.getElementById('solicitudes')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const scopeLabel = channel === 'ecommerce' ? 'canal Ecommerce' : sucursal || 'tu sucursal'
 
   return (
     <div className="mx-auto max-w-[960px] px-4 py-8 lg:px-6">
-      {/* Saludo */}
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Hola, {firstName} 👋</h1>
-        <p className="mt-1 text-sm text-slate-500">Portal de devoluciones · {sucursal || 'tu sucursal'}</p>
+        <p className="mt-1 text-sm text-slate-500">Portal de devoluciones · {scopeLabel}</p>
       </div>
 
-      {/* Acciones principales — el corazón del portal */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <ActionCard
-          primary
-          title="Crear devolución"
-          desc="Registra un nuevo expediente"
-          icon={<Plus className="h-6 w-6" />}
-          onClick={() => navigate('/nueva')}
-        />
-        <ActionCard
-          title="Consultar devolución"
-          desc="Busca y da seguimiento a tus expedientes"
-          icon={<Search className="h-6 w-6" />}
-          onClick={() => navigate('/devoluciones')}
-        />
-        <ActionCard
-          title="Mis pendientes"
-          desc="Casos que requieren tu acción"
-          icon={<Inbox className="h-6 w-6" />}
-          badge={pendientes.length}
-          onClick={() => navigate('/pendientes')}
-        />
-        <ActionCard
-          title="Responder solicitudes"
-          desc="Información que Compras te pidió"
-          icon={<MessageSquareReply className="h-6 w-6" />}
-          badge={solicitudes.length}
-          onClick={scrollToSolicitudes}
-        />
+      {/* Vistas principales — cada tarjeta abre una pantalla con todos los casos */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ActionCard primary title="Nueva devolución" desc="Registra un nuevo expediente" icon={<Plus className="h-6 w-6" />} onClick={() => navigate('/nueva')} />
+        <ActionCard title="Mis devoluciones" desc="Todos tus expedientes" icon={<Search className="h-6 w-6" />} onClick={() => navigate('/devoluciones')} />
+        <ActionCard title="Mis pendientes" desc="Requieren tu acción" icon={<Inbox className="h-6 w-6" />} badge={pendientes.length} onClick={() => navigate('/pendientes')} />
+        <ActionCard title="Pendientes de información" desc="Compras te pidió datos" icon={<MessageSquareReply className="h-6 w-6" />} badge={infoPend.length} onClick={() => navigate('/devoluciones?status=esperando')} />
+        <ActionCard title="Casos en tránsito" desc="Mercancía hacia CEDIS" icon={<Truck className="h-6 w-6" />} badge={enTransito.length} onClick={() => navigate('/devoluciones?status=transito')} />
+        <ActionCard title="Casos rechazados" desc="Devoluciones no procedentes" icon={<XCircle className="h-6 w-6" />} badge={rechazadas.length} onClick={() => navigate('/devoluciones?status=rechazado')} />
       </div>
 
-      {/* Resumen de seguimiento — compacto, sin datos corporativos */}
-      <div className="mt-6 grid grid-cols-3 gap-4">
-        <KpiCard label="Autorizadas" value={autorizadas.length} accent="success" icon={<CheckCircle2 className="h-4 w-4" />} />
-        <KpiCard label="En tránsito" value={enTransito.length} icon={<Truck className="h-4 w-4" />} />
-        <KpiCard label="Rechazadas" value={rechazadas.length} icon={<XCircle className="h-4 w-4" />} />
-      </div>
-
-      {/* Solicitudes de información — donde Tienda responde a Compras */}
-      <div id="solicitudes" className="mt-8 scroll-mt-24">
-        <CaseListCard
-          title="Solicitudes de información"
-          icon={<MessageSquareReply className="h-4 w-4" />}
-          cases={solicitudes}
-          emptyText="No tienes solicitudes pendientes de responder. 🎉"
-        />
-      </div>
-
-      {/* Mis pendientes */}
-      <div className="mt-4">
-        <CaseListCard
-          title="Mis pendientes"
-          icon={<Inbox className="h-4 w-4" />}
-          cases={pendientes}
-          emptyText="No tienes casos que requieran tu acción. 🎉"
-          onSeeAll={() => navigate('/pendientes')}
-        />
+      {/* Lo que ha pasado en tus expedientes */}
+      <div className="mt-8">
+        <RecentActivity cases={mine} />
       </div>
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Dashboard ejecutivo de COMPRAS (corporativo).
-// KPIs globales, gráficas estratégicas y bandeja de autorización.
+// Dashboard OPERATIVO de Compras — orientado a la toma de decisiones.
+// KPIs de operación + análisis de incidencias. Sin comparativos por sucursal,
+// KPIs financieros ni tendencias corporativas.
 // ---------------------------------------------------------------------------
 
 function ComprasDashboard() {
   const navigate = useNavigate()
-
   const porAutorizar = RETURNS.filter((r) => r.status === 'revision' && r.tipo !== 'redistribucion')
-  const slaPct = Math.round(((KPIS.total - KPIS.fueraSla) / KPIS.total) * 100)
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-6 lg:px-8">
       <PageHeader
-        title="Dashboard ejecutivo"
-        subtitle="Indicadores de devoluciones en tiempo real · Grupo Calzzapato"
+        title="Dashboard operativo"
+        subtitle="Prioriza autorizaciones y detecta incidencias · Compras"
         actions={
           <Button size="sm" variant="ghost" icon={<Sparkles className="h-4 w-4 text-brand-600" />} onClick={() => navigate('/reportes')}>
             Ver reportes
@@ -420,33 +418,18 @@ function ComprasDashboard() {
         }
       />
 
-      {/* KPIs ejecutivos corporativos */}
+      {/* KPIs operativos */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
-        <KpiCard label="Total de devoluciones" value={KPIS.total} hint="Julio 2026" icon={<Package className="h-4 w-4" />} />
-        <KpiCard label="Pendientes" value={KPIS.pendientes} hint="En proceso" accent="warning" icon={<Clock className="h-4 w-4" />} />
-        <KpiCard label="Autorizadas" value={KPIS.autorizadas} hint="53% del total" accent="success" icon={<CheckCircle2 className="h-4 w-4" />} />
-        <KpiCard label="Rechazadas" value={KPIS.rechazadas} hint="9% del total" icon={<XCircle className="h-4 w-4" />} />
-        <KpiCard label="Cumplimiento SLA" value={`${slaPct}%`} hint="Meta: 95%" accent="success" icon={<Gauge className="h-4 w-4" />} />
-        <KpiCard label="Tiempo prom. resolución" value={KPIS.tiempoPromedio} hint="Meta: 2 días" icon={<Timer className="h-4 w-4" />} />
+        <KpiCard label="Pendientes de autorización" value={COMPRAS_KPIS.porAutorizar} accent="warning" icon={<ClipboardCheck className="h-4 w-4" />} />
+        <KpiCard label="Solicitudes de información" value={COMPRAS_KPIS.solicitudesAbiertas} hint="Abiertas" icon={<MessageSquareReply className="h-4 w-4" />} />
+        <KpiCard label="Críticos próximos a SLA" value={COMPRAS_KPIS.criticosSla} accent="danger" icon={<AlertTriangle className="h-4 w-4" />} />
+        <KpiCard label="Tiempo prom. autorización" value={COMPRAS_KPIS.tiempoAutorizacion} icon={<Timer className="h-4 w-4" />} />
+        <KpiCard label="Cumplimiento SLA Compras" value={`${COMPRAS_KPIS.cumplimientoSla}%`} accent="success" icon={<Gauge className="h-4 w-4" />} />
+        <KpiCard label="Devoluciones masivas activas" value={COMPRAS_KPIS.masivasActivas} icon={<Layers className="h-4 w-4" />} />
       </div>
 
-      {/* Gráficas ejecutivas */}
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <TrendChart />
-        <TypePie />
-        <HBarChart title="Devoluciones por motivo" data={byMotivo} color="#6366f1" />
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <SucursalChart />
-        <LotesCard />
-      </div>
-
-      {/* Bandeja de autorización */}
+      {/* Bandeja de autorización — lo más accionable, justo debajo de los KPIs */}
       <div className="mt-4">
-        <div className="mb-2 flex items-center gap-2 px-1 text-xs font-medium uppercase tracking-wide text-slate-400">
-          Tu operación · Compras
-        </div>
         <CaseListCard
           title="Pendientes de tu autorización"
           icon={<ClipboardCheck className="h-4 w-4" />}
@@ -455,11 +438,29 @@ function ComprasDashboard() {
           onSeeAll={() => navigate('/pendientes')}
         />
       </div>
+
+      {/* Análisis operativos — mezcla de gráficas según el tipo de dato */}
+      <div className="mt-6 mb-2 px-1 text-xs font-medium uppercase tracking-wide text-slate-400">Análisis operativos</div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <HBarChart title="Productos con mayor incidencia" data={byProducto} color="#D32F2F" hint="Ranking" />
+        <PieChartCard title="Motivos más frecuentes" data={byMotivo} hint="Composición" />
+        <AreaTrend title="Autorizaciones por día" data={autorizacionesTrend} hint="Últimos 7 días" />
+      </div>
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <VBarChart title="Proveedores con más devoluciones" data={byProveedor} color="#f59e0b" />
+        <VBarChart title="Marcas con más devoluciones" data={byMarca} color="#0ea5e9" />
+        <HBarChart title="Compradores con mayor carga" data={byComprador} color="#8b5cf6" hint="Expedientes abiertos" />
+      </div>
+      <div className="mt-4">
+        <LotesCard />
+      </div>
     </div>
   )
 }
 
 export default function Dashboard() {
   const { role } = useRole()
-  return role === 'tienda' ? <TiendaPortal /> : <ComprasDashboard />
+  if (role === 'tienda') return <OperationalPortal channel="tienda" />
+  if (role === 'ecommerce') return <OperationalPortal channel="ecommerce" />
+  return <ComprasDashboard />
 }

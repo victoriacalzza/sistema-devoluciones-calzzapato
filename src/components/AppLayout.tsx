@@ -21,7 +21,8 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { Avatar, Button, cn } from '../lib/ui'
-import { NOTIFICATIONS, personByRole, ROLE_LABEL, type RoleKey } from '../data/mock'
+import { KelderLogo } from './KelderLogo'
+import { NOTIFICATIONS, DEMO_PERSONAS } from '../data/mock'
 import { useRole } from '../lib/RoleContext'
 import { canSeeNav, type NavKey } from '../lib/permissions'
 
@@ -44,18 +45,13 @@ const NOTIF_ICON = {
 }
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const { role } = useRole()
-  const visibleNav = NAV.filter((item) => canSeeNav(role, item.key))
+  const { role, admin } = useRole()
+  const visibleNav = NAV.filter((item) => canSeeNav(role, item.key, admin))
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2.5 px-5 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-sm font-bold text-white shadow-sm">
-          C
-        </div>
-        <div className="leading-tight">
-          <div className="text-sm font-semibold text-slate-900">Calzzapato</div>
-          <div className="text-[11px] text-slate-400">Devoluciones</div>
-        </div>
+      <div className="px-5 py-5">
+        <KelderLogo className="h-8 w-auto" />
+        <div className="mt-1.5 text-[11px] font-medium text-slate-400">Sistema de Devoluciones</div>
       </div>
 
       <nav className="flex-1 space-y-0.5 px-3 py-2">
@@ -96,7 +92,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 function RoleSwitcher({ dropUp = true }: { dropUp?: boolean }) {
-  const { user, role, setRole } = useRole()
+  const { user, setPersona } = useRole()
   const [open, setOpen] = useState(false)
   return (
     <div className="relative">
@@ -123,26 +119,26 @@ function RoleSwitcher({ dropUp = true }: { dropUp?: boolean }) {
             <div className="border-b border-slate-100 px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-slate-400">
               Cambiar de rol (demo)
             </div>
-            {(['tienda', 'compras'] as RoleKey[]).map((rk) => {
-              const p = personByRole(rk)
+            {DEMO_PERSONAS.map((p) => {
+              const activo = p.id === user.id
               return (
                 <button
-                  key={rk}
+                  key={p.id}
                   onClick={() => {
-                    setRole(rk)
+                    setPersona(p)
                     setOpen(false)
                   }}
                   className={cn(
                     'flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-slate-50',
-                    rk === role && 'bg-brand-50',
+                    activo && 'bg-brand-50',
                   )}
                 >
                   <Avatar person={p} size="sm" />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium text-slate-800">{ROLE_LABEL[rk]}</div>
-                    <div className="truncate text-[11px] text-slate-400">{p.name}</div>
+                    <div className="truncate font-medium text-slate-800">{p.name}</div>
+                    <div className="truncate text-[11px] text-slate-400">{p.role}</div>
                   </div>
-                  {rk === role && <span className="h-2 w-2 rounded-full bg-brand-600" />}
+                  {activo && <span className="h-2 w-2 rounded-full bg-brand-600" />}
                 </button>
               )
             })}
@@ -213,14 +209,9 @@ function PortalLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-slate-50">
       <header className="relative z-20 flex h-16 shrink-0 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur lg:px-8">
-        <button onClick={() => navigate('/')} className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-sm font-bold text-white shadow-sm">
-            C
-          </div>
-          <div className="leading-tight text-left">
-            <div className="text-sm font-semibold text-slate-900">Calzzapato</div>
-            <div className="text-[11px] text-slate-400">Portal de devoluciones</div>
-          </div>
+        <button onClick={() => navigate('/')} className="flex items-center gap-3">
+          <KelderLogo className="h-8 w-auto" />
+          <span className="hidden text-[11px] font-medium text-slate-400 sm:inline">Portal de devoluciones</span>
         </button>
 
         {!onHome && (
@@ -262,10 +253,8 @@ function PortalLayout({ children }: { children: React.ReactNode }) {
 function ErpLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
-  const navigate = useNavigate()
-  const { user, role } = useRole()
+  const { user } = useRole()
   const unread = NOTIFICATIONS.filter((n) => n.unread).length
-  const showNueva = canSeeNav(role, 'nueva')
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-slate-50">
@@ -303,11 +292,6 @@ function ErpLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex flex-1 items-center justify-end gap-2">
-            {showNueva && (
-              <Button variant="primary" size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => navigate('/nueva')}>
-                <span className="hidden sm:inline">Nueva devolución</span>
-              </Button>
-            )}
             <div className="relative">
               <button
                 onClick={() => setNotifOpen((v) => !v)}
@@ -336,7 +320,8 @@ function ErpLayout({ children }: { children: React.ReactNode }) {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { role } = useRole()
-  return role === 'tienda' ? <PortalLayout>{children}</PortalLayout> : <ErpLayout>{children}</ErpLayout>
+  // Canales operativos (Tienda y Ecommerce) usan el portal simple; Compras el ERP.
+  return role === 'compras' ? <ErpLayout>{children}</ErpLayout> : <PortalLayout>{children}</PortalLayout>
 }
 
 export function PageHeader({

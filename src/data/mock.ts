@@ -92,9 +92,9 @@ export const RETURN_TYPES: Record<
   },
   redistribucion: {
     key: 'redistribucion',
-    label: 'Redistribución',
-    short: 'Redistribución',
-    desc: 'Movimiento de mercancía entre sucursales.',
+    label: 'Incidencia en redistribución',
+    short: 'Incidencia en redistribución',
+    desc: 'Incidencia detectada en un movimiento de mercancía entre sucursales.',
     icon: 'truck',
     requires: ['Folio de traslado', 'Tienda origen', 'Escanear producto'],
   },
@@ -108,11 +108,13 @@ export const RETURN_TYPES: Record<
   },
 }
 
-// El sistema tiene únicamente DOS roles: Tienda (sucursal) y Compras (corporativo).
-export type RoleKey = 'tienda' | 'compras'
+// El sistema tiene TRES roles: Tienda (sucursal), Ecommerce (canal en línea) y
+// Compras (corporativo). Administrador es un SUBROL dentro de Compras (flag admin).
+export type RoleKey = 'tienda' | 'ecommerce' | 'compras'
 
 export const ROLE_LABEL: Record<RoleKey, string> = {
   tienda: 'Tienda',
+  ecommerce: 'Ecommerce',
   compras: 'Compras',
 }
 
@@ -123,25 +125,52 @@ export interface Person {
   roleKey: RoleKey
   initials: string
   color: string
+  /** Subrol Administrador (solo aplica a Compras): acceso a configuración maestra. */
+  admin?: boolean
+  /** Datos de comprador (solo Compras): línea, marcas y proveedores que gestiona. */
+  linea?: string
+  marcas?: string[]
+  proveedores?: string[]
 }
 
 export const PEOPLE: Person[] = [
   { id: 'u1', name: 'Karen Ríos', role: 'Tienda · Culiacán Centro', roleKey: 'tienda', initials: 'KR', color: 'bg-rose-500' },
   { id: 'u2', name: 'Miguel Andrade', role: 'Tienda · Guadalajara Andares', roleKey: 'tienda', initials: 'MA', color: 'bg-indigo-500' },
-  { id: 'u3', name: 'Fernanda López', role: 'Compras', roleKey: 'compras', initials: 'FL', color: 'bg-emerald-500' },
-  { id: 'u4', name: 'Óscar Beltrán', role: 'Compras', roleKey: 'compras', initials: 'OB', color: 'bg-amber-500' },
-  { id: 'u5', name: 'Diana Quintero', role: 'Compras', roleKey: 'compras', initials: 'DQ', color: 'bg-teal-500' },
+  {
+    id: 'u3', name: 'Fernanda López', role: 'Compras · Calzado Deportivo', roleKey: 'compras', initials: 'FL', color: 'bg-emerald-500',
+    linea: 'Calzado Deportivo', marcas: ['Nike', 'Adidas', 'Skechers'], proveedores: ['Nike México', 'Adidas México', 'VF Corp'],
+  },
+  {
+    id: 'u4', name: 'Óscar Beltrán', role: 'Compras · Calzado Confort', roleKey: 'compras', initials: 'OB', color: 'bg-amber-500',
+    linea: 'Calzado Confort', marcas: ['Flexi', 'Andrea'], proveedores: ['Calzado Flexi S.A.', 'Grupo Andrea'],
+  },
+  {
+    id: 'u5', name: 'Diana Quintero', role: 'Compras · Accesorios', roleKey: 'compras', initials: 'DQ', color: 'bg-teal-500',
+    linea: 'Accesorios', marcas: ['Coach', 'Puma', 'Vans'], proveedores: ['VF Corp', 'Puma LATAM'],
+  },
+  {
+    id: 'u6', name: 'Jorge Villa', role: 'Compras · Administrador', roleKey: 'compras', initials: 'JV', color: 'bg-slate-700',
+    admin: true, linea: 'Coordinación', marcas: [], proveedores: [],
+  },
+  { id: 'u7', name: 'Paola Ceballos', role: 'Ecommerce · Marketplace', roleKey: 'ecommerce', initials: 'PC', color: 'bg-fuchsia-500' },
 ]
 
 /** Persona canónica que representa cada rol en el selector de demo. */
 export const ROLE_USER: Record<RoleKey, Person> = {
   tienda: PEOPLE[0],
+  ecommerce: PEOPLE[6],
   compras: PEOPLE[2],
 }
 
 export function personByRole(roleKey: RoleKey): Person {
   return ROLE_USER[roleKey] ?? PEOPLE[0]
 }
+
+/** Persona Administrador (subrol de Compras) para la demo. */
+export const ADMIN_USER: Person = PEOPLE[5]
+
+/** Personas del selector de demo (incluye el subrol Administrador de Compras). */
+export const DEMO_PERSONAS: Person[] = [PEOPLE[0], PEOPLE[6], PEOPLE[2], PEOPLE[5]]
 
 export const SUCURSALES = [
   'Culiacán Centro',
@@ -157,6 +186,7 @@ export const SUCURSALES = [
 export const MARCAS = ['Nike', 'Adidas', 'Flexi', 'Andrea', 'Vans', 'Puma', 'Coach', 'Skechers']
 export const PROVEEDORES = ['Calzado Flexi S.A.', 'Nike México', 'Adidas México', 'Grupo Andrea', 'VF Corp', 'Puma LATAM']
 export const CATEGORIAS = ['Calzado dama', 'Calzado caballero', 'Calzado infantil', 'Ropa', 'Accesorios', 'Deportivo']
+export const LINEAS = ['Calzado Deportivo', 'Calzado Confort', 'Accesorios']
 export const MOTIVOS = [
   'Costura abierta',
   'Suela despegada',
@@ -167,6 +197,138 @@ export const MOTIVOS = [
   'Manchas / decoloración',
   'Daño en transporte',
 ]
+
+// -------------------- Catálogo Comprador · Línea · Marca -------------------
+// Base para la asignación automática del comprador responsable de un expediente
+// y para reportes / devoluciones masivas / identificación de responsables.
+
+export interface CLMRow {
+  linea: string
+  marca: string
+  proveedor: string
+  compradorId: string
+}
+
+export const CATALOGO_CLM: CLMRow[] = [
+  { linea: 'Calzado Deportivo', marca: 'Nike', proveedor: 'Nike México', compradorId: 'u3' },
+  { linea: 'Calzado Deportivo', marca: 'Adidas', proveedor: 'Adidas México', compradorId: 'u3' },
+  { linea: 'Calzado Deportivo', marca: 'Skechers', proveedor: 'VF Corp', compradorId: 'u3' },
+  { linea: 'Calzado Confort', marca: 'Flexi', proveedor: 'Calzado Flexi S.A.', compradorId: 'u4' },
+  { linea: 'Calzado Confort', marca: 'Andrea', proveedor: 'Grupo Andrea', compradorId: 'u4' },
+  { linea: 'Accesorios', marca: 'Coach', proveedor: 'VF Corp', compradorId: 'u5' },
+  { linea: 'Accesorios', marca: 'Puma', proveedor: 'Puma LATAM', compradorId: 'u5' },
+  { linea: 'Accesorios', marca: 'Vans', proveedor: 'VF Corp', compradorId: 'u5' },
+]
+
+export interface CompradorInfo {
+  comprador: Person
+  linea: string
+  marca: string
+  proveedor: string
+}
+
+/** Asignación automática: identifica al comprador que gestiona esa marca/línea. */
+export function compradorForMarca(marca: string): CompradorInfo | undefined {
+  const row = CATALOGO_CLM.find((r) => r.marca === marca)
+  if (!row) return undefined
+  return { comprador: personById(row.compradorId), linea: row.linea, marca: row.marca, proveedor: row.proveedor }
+}
+
+// ----------------------- Resoluciones (cliente) ----------------------------
+// Al autorizar una devolución de cliente, Compras debe elegir una resolución.
+
+export type ResolutionKey =
+  | 'cambio_fisico'
+  | 'vale'
+  | 'reembolso'
+  | 'bonificacion'
+  | 'sustitucion'
+  | 'reparacion'
+
+export const RESOLUTIONS: Record<ResolutionKey, string> = {
+  cambio_fisico: 'Cambio físico',
+  vale: 'Vale de compra',
+  reembolso: 'Reembolso',
+  bonificacion: 'Bonificación',
+  sustitucion: 'Sustitución por producto equivalente',
+  reparacion: 'Reparación',
+}
+
+// -------------------------- Existencias por producto -----------------------
+// Existencias globales y por sucursal para el SKU/lote asociado al expediente.
+
+export interface ExistenciaSucursal {
+  sucursal: string
+  cantidad: number
+}
+
+export interface Existencias {
+  total: number
+  disponible: number
+  transito: number
+  comprometida: number
+  porSucursal: ExistenciaSucursal[]
+}
+
+const EXISTENCIAS_BY_LOTE: Record<string, Existencias> = {
+  'LT-NK-2291': {
+    total: 28, disponible: 19, transito: 6, comprometida: 3,
+    porSucursal: [
+      { sucursal: 'Culiacán Centro', cantidad: 12 },
+      { sucursal: 'Culiacán Forum', cantidad: 8 },
+      { sucursal: 'Los Mochis Plaza', cantidad: 5 },
+      { sucursal: 'Hermosillo Sur', cantidad: 3 },
+    ],
+  },
+  'LT-AD-1180': {
+    total: 21, disponible: 16, transito: 3, comprometida: 2,
+    porSucursal: [
+      { sucursal: 'Culiacán Centro', cantidad: 9 },
+      { sucursal: 'Guadalajara Andares', cantidad: 7 },
+      { sucursal: 'Guasave Centro', cantidad: 5 },
+    ],
+  },
+}
+
+const EXISTENCIAS_DEFAULT: Existencias = {
+  total: 14, disponible: 9, transito: 3, comprometida: 2,
+  porSucursal: [
+    { sucursal: 'Culiacán Centro', cantidad: 6 },
+    { sucursal: 'Mazatlán Marina', cantidad: 4 },
+    { sucursal: 'Los Mochis Plaza', cantidad: 4 },
+  ],
+}
+
+/** Existencias del producto/lote — total, disponible, tránsito, comprometida y por sucursal. */
+export function existenciasFor(lote: string): Existencias {
+  return EXISTENCIAS_BY_LOTE[lote] ?? EXISTENCIAS_DEFAULT
+}
+
+// ------------------------------ Detalle de lote ----------------------------
+
+export interface LoteDetalle {
+  lote: string
+  marca: string
+  linea: string
+  proveedor: string
+  compradorId: string
+  existencias: Existencias
+}
+
+/** Ficha de lote: marca, línea, proveedor, comprador responsable y existencias. */
+export function loteDetalle(lote: string): LoteDetalle | undefined {
+  const ret = RETURNS.find((r) => r.lote === lote)
+  const marca = ret?.marca ?? topLotes.find((l) => l.lote === lote)?.marca ?? '—'
+  const clm = CATALOGO_CLM.find((r) => r.marca === marca)
+  return {
+    lote,
+    marca,
+    linea: clm?.linea ?? '—',
+    proveedor: clm?.proveedor ?? ret?.proveedor ?? '—',
+    compradorId: clm?.compradorId ?? 'u3',
+    existencias: existenciasFor(lote),
+  }
+}
 
 export interface TimelineEvent {
   time: string
@@ -227,6 +389,20 @@ export interface ReturnCase {
   comments: Comment[]
   timeline: TimelineEvent[]
   transfer?: Transfer
+  /** Resolución elegida por Compras al autorizar (solo devoluciones de cliente). */
+  resolucion?: ResolutionKey
+  /** ID de venta (Ecommerce) — equivalente a la factura física de tienda. */
+  idVenta?: string
+  /** Subregistros de una depuración masiva (cada producto con SKU, motivo y evidencia). */
+  subproductos?: SubProducto[]
+}
+
+export interface SubProducto {
+  sku: string
+  descripcion: string
+  motivo: string
+  evidencia?: string
+  image: string
 }
 
 // Small deterministic image pool (Unsplash — shoes / product)
@@ -315,6 +491,7 @@ export const RETURNS: ReturnCase[] = [
     motivo: 'Talla incorrecta',
     responsableId: 'u3',
     creadorId: 'u2',
+    idVenta: 'EC-99120',
     slaDue: 'Resuelto',
     outOfSla: false,
     product: {
@@ -428,7 +605,7 @@ export const RETURNS: ReturnCase[] = [
   {
     folio: 'DEV-2026-000150',
     tipo: 'cliente',
-    status: 'recibido',
+    status: 'cerrado',
     priority: 'media',
     sucursal: 'Culiacán Forum',
     cliente: 'Patricia Vega',
@@ -443,6 +620,7 @@ export const RETURNS: ReturnCase[] = [
     motivo: 'Costura abierta',
     responsableId: 'u5',
     creadorId: 'u1',
+    resolucion: 'cambio_fisico',
     slaDue: 'Resuelto',
     outOfSla: false,
     product: {
@@ -528,6 +706,7 @@ export const RETURNS: ReturnCase[] = [
     motivo: 'Defecto de fábrica',
     responsableId: 'u4',
     creadorId: 'u2',
+    idVenta: 'EC-98004',
     slaDue: 'Fuera de SLA',
     outOfSla: true,
     product: {
@@ -613,6 +792,11 @@ export const RETURNS: ReturnCase[] = [
     evidences: [{ url: IMG.boxShoes, label: 'Lote' }],
     documents: [],
     comments: [],
+    subproductos: [
+      { sku: 'FX-IN-3301', descripcion: 'Zapato escolar Flexi niño — Negro', motivo: 'Defecto de fábrica', evidencia: 'defecto_01.jpg', image: IMG.boxShoes },
+      { sku: 'FX-IN-3302', descripcion: 'Zapato escolar Flexi niño — Café', motivo: 'Costura abierta', evidencia: 'defecto_02.jpg', image: IMG.bootBrown },
+      { sku: 'FX-IN-3303', descripcion: 'Tenis escolar Flexi niño — Blanco', motivo: 'Suela despegada', evidencia: 'defecto_03.jpg', image: IMG.sneakerWhite },
+    ],
     timeline: [
       ev('28 jun', '10:00', 'Karen Ríos', 'creó el expediente', 'create'),
       ev('29 jun', '11:00', 'Diana Quintero', 'validó calidad', 'status'),
@@ -633,14 +817,20 @@ export function personById(id: string): Person {
 
 export interface MassSub {
   sucursal: string
-  esperado: number
+  solicitado: number
+  enviado: number
   recibido: number
+  responsableId: string
+  fechaCompromiso: string
   status: StatusKey
+  evidencias: { url: string; label: string }[]
+  historial: TimelineEvent[]
 }
 
 export interface MassReturn {
   folio: string
   lote: string
+  linea: string
   marca: string
   proveedor: string
   producto: string
@@ -649,39 +839,50 @@ export interface MassReturn {
   subs: MassSub[]
 }
 
+/** Unidades pendientes de una sucursal (solicitado − enviado). */
+export function subPendiente(s: MassSub): number {
+  return Math.max(0, s.solicitado - s.enviado)
+}
+
 export const MASS_RETURNS: MassReturn[] = [
   {
     folio: 'DEV-M-2026-0042',
     lote: 'LT-NK-2291',
+    linea: 'Calzado Deportivo',
     marca: 'Nike',
     proveedor: 'Nike México',
     producto: 'Nike Air Jordan 1 Mid — Lote defectuoso',
     creada: '04 jul 2026',
     responsable: 'Fernanda López',
     subs: [
-      { sucursal: 'Culiacán Centro', esperado: 12, recibido: 12, status: 'recibido' },
-      { sucursal: 'Culiacán Forum', esperado: 8, recibido: 8, status: 'recibido' },
-      { sucursal: 'Mazatlán Marina', esperado: 10, recibido: 6, status: 'transito' },
-      { sucursal: 'Guadalajara Andares', esperado: 15, recibido: 0, status: 'pendiente_traslado' },
-      { sucursal: 'Los Mochis Plaza', esperado: 6, recibido: 6, status: 'recibido' },
-      { sucursal: 'Hermosillo Sur', esperado: 9, recibido: 0, status: 'nuevo' },
+      { sucursal: 'Culiacán Centro', solicitado: 12, enviado: 12, recibido: 12, responsableId: 'u1', fechaCompromiso: '06 jul 2026', status: 'recibido', evidencias: [{ url: IMG.boxShoes, label: 'Empaque de envío' }], historial: [ev('05 jul', '09:00', 'Karen Ríos', 'preparó el envío', 'attach'), ev('06 jul', '14:00', 'CEDIS Culiacán', 'recibió 12 uds.', 'receive')] },
+      { sucursal: 'Culiacán Forum', solicitado: 8, enviado: 8, recibido: 8, responsableId: 'u1', fechaCompromiso: '06 jul 2026', status: 'recibido', evidencias: [{ url: IMG.boxShoes, label: 'Empaque' }], historial: [ev('06 jul', '15:30', 'CEDIS Culiacán', 'recibió 8 uds.', 'receive')] },
+      { sucursal: 'Mazatlán Marina', solicitado: 10, enviado: 6, recibido: 6, responsableId: 'u2', fechaCompromiso: '08 jul 2026', status: 'transito', evidencias: [{ url: IMG.sneakerRed, label: 'Producto' }], historial: [ev('07 jul', '10:00', 'Miguel Andrade', 'envió 6 de 10 uds.', 'transfer')] },
+      { sucursal: 'Guadalajara Andares', solicitado: 15, enviado: 0, recibido: 0, responsableId: 'u2', fechaCompromiso: '09 jul 2026', status: 'pendiente_traslado', evidencias: [], historial: [ev('05 jul', '09:00', 'Sistema', 'generó el subexpediente', 'create')] },
+      { sucursal: 'Los Mochis Plaza', solicitado: 6, enviado: 6, recibido: 6, responsableId: 'u1', fechaCompromiso: '06 jul 2026', status: 'recibido', evidencias: [{ url: IMG.boxShoes, label: 'Empaque' }], historial: [ev('06 jul', '12:00', 'CEDIS Culiacán', 'recibió 6 uds.', 'receive')] },
+      { sucursal: 'Hermosillo Sur', solicitado: 9, enviado: 0, recibido: 0, responsableId: 'u1', fechaCompromiso: '09 jul 2026', status: 'nuevo', evidencias: [], historial: [ev('05 jul', '09:00', 'Sistema', 'generó el subexpediente', 'create')] },
     ],
   },
   {
     folio: 'DEV-M-2026-0041',
     lote: 'LT-AD-1180',
+    linea: 'Calzado Deportivo',
     marca: 'Adidas',
     proveedor: 'Adidas México',
     producto: 'Adidas Ultraboost Light — Retiro de lote',
     creada: '01 jul 2026',
     responsable: 'Fernanda López',
     subs: [
-      { sucursal: 'Culiacán Centro', esperado: 5, recibido: 5, status: 'recibido' },
-      { sucursal: 'Guadalajara Andares', esperado: 7, recibido: 7, status: 'recibido' },
-      { sucursal: 'Guasave Centro', esperado: 4, recibido: 4, status: 'recibido' },
+      { sucursal: 'Culiacán Centro', solicitado: 5, enviado: 5, recibido: 5, responsableId: 'u1', fechaCompromiso: '03 jul 2026', status: 'recibido', evidencias: [{ url: IMG.sneakerWhite, label: 'Producto' }], historial: [ev('03 jul', '11:00', 'CEDIS Culiacán', 'recibió 5 uds.', 'receive')] },
+      { sucursal: 'Guadalajara Andares', solicitado: 7, enviado: 7, recibido: 7, responsableId: 'u2', fechaCompromiso: '03 jul 2026', status: 'recibido', evidencias: [{ url: IMG.sneakerWhite, label: 'Producto' }], historial: [ev('03 jul', '13:00', 'CEDIS Culiacán', 'recibió 7 uds.', 'receive')] },
+      { sucursal: 'Guasave Centro', solicitado: 4, enviado: 4, recibido: 4, responsableId: 'u1', fechaCompromiso: '03 jul 2026', status: 'recibido', evidencias: [], historial: [ev('03 jul', '14:00', 'CEDIS Culiacán', 'recibió 4 uds.', 'receive')] },
     ],
   },
 ]
+
+export function findMassReturn(folio: string): MassReturn | undefined {
+  return MASS_RETURNS.find((m) => m.folio === folio)
+}
 
 // --------------------------- Notificaciones --------------------------------
 
@@ -774,5 +975,42 @@ export const topLotes = [
   { lote: 'LT-VN-3320', marca: 'Vans', proveedor: 'VF Corp', incidencias: 11, tasa: '4.0%' },
   { lote: 'LT-PM-9910', marca: 'Puma', proveedor: 'Puma LATAM', incidencias: 9, tasa: '3.3%' },
 ]
+
+// Productos con mayor incidencia (análisis operativo de Compras).
+export const byProducto = [
+  { name: 'Nike Air Jordan 1 Mid', value: 24 },
+  { name: 'Adidas Ultraboost Light', value: 18 },
+  { name: 'Flexi confort dama', value: 15 },
+  { name: 'Vans Old Skool', value: 11 },
+  { name: 'Puma RS-X', value: 9 },
+]
+
+// Compradores con mayor carga operativa (expedientes abiertos asignados).
+export const byComprador = [
+  { name: 'Fernanda López', value: 21 },
+  { name: 'Diana Quintero', value: 14 },
+  { name: 'Óscar Beltrán', value: 9 },
+]
+
+// Autorizaciones resueltas por día (serie temporal para Compras).
+export const autorizacionesTrend = [
+  { name: 'Lun', value: 9 },
+  { name: 'Mar', value: 14 },
+  { name: 'Mié', value: 11 },
+  { name: 'Jue', value: 17 },
+  { name: 'Vie', value: 15 },
+  { name: 'Sáb', value: 6 },
+  { name: 'Dom', value: 3 },
+]
+
+// KPIs operativos de Compras (dashboard orientado a decisión, no ejecutivo).
+export const COMPRAS_KPIS = {
+  porAutorizar: 12,
+  solicitudesAbiertas: 5,
+  criticosSla: 3,
+  tiempoAutorizacion: '4.2 h',
+  cumplimientoSla: 94,
+  masivasActivas: 2,
+}
 
 export const CHART_COLORS = ['#D32F2F', '#f59e0b', '#6366f1', '#10b981', '#0ea5e9', '#8b5cf6']

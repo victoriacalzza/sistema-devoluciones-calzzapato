@@ -5,8 +5,12 @@ import { PEOPLE } from '../data/mock'
 
 const ROLES = [
   { role: 'Tienda', perms: 'Registrar expedientes, adjuntar evidencias, dar seguimiento y responder solicitudes' },
+  { role: 'Ecommerce', perms: 'Registrar devoluciones del canal en línea, adjuntar evidencias y responder solicitudes' },
   { role: 'Compras', perms: 'Revisar, autorizar/rechazar, gestionar masivas, devolver a proveedor y cerrar' },
+  { role: 'Administrador', perms: 'Subrol de Compras: usuarios, roles, permisos, SLA, motivos, resoluciones y catálogos maestros' },
 ]
+
+const ADMIN_MODULES = ['Usuarios', 'Roles', 'Permisos', 'SLA', 'Motivos', 'Resoluciones', 'Parámetros del sistema', 'Catálogos maestros']
 
 function Toggle({ on }: { on: boolean }) {
   return (
@@ -19,7 +23,22 @@ function Toggle({ on }: { on: boolean }) {
 export default function Settings() {
   return (
     <div className="mx-auto max-w-[1100px] px-4 py-6 lg:px-8">
-      <PageHeader title="Configuración" subtitle="Preferencias del sistema, roles y notificaciones" />
+      <PageHeader title="Configuración" subtitle="Panel de Administrador · parámetros, roles y catálogos maestros" />
+
+      <Card className="mb-5 border-slate-300 bg-slate-50">
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-800 text-white"><ShieldCheck className="h-5 w-5" /></span>
+          <div>
+            <div className="text-sm font-semibold text-slate-900">Acceso exclusivo de Administrador</div>
+            <div className="text-xs text-slate-500">Solo el subrol Administrador (dentro de Compras) puede ver y editar estos módulos.</div>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {ADMIN_MODULES.map((m) => (
+            <span key={m} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600">{m}</span>
+          ))}
+        </div>
+      </Card>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Card>
