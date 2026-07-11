@@ -13,11 +13,12 @@ import {
   Check,
   Plus,
   Trash2,
+  ShieldCheck,
   Image as ImageIcon,
 } from 'lucide-react'
 import { PageHeader } from '../components/AppLayout'
 import { Card, Button, cn } from '../lib/ui'
-import { RETURN_TYPES, SUCURSALES, MOTIVOS, MARCAS, LINEAS, type ReturnTypeKey } from '../data/mock'
+import { RETURN_TYPES, SUCURSALES, MOTIVOS, MARCAS, LINEAS, supervisorByCode, type ReturnTypeKey } from '../data/mock'
 import { useRole } from '../lib/RoleContext'
 
 const TYPE_ICON: Record<ReturnTypeKey, typeof Store> = {
@@ -67,6 +68,10 @@ export default function NewReturn() {
     { sku: 'FX-IN-3301', motivo: 'Defecto de fábrica', evidencia: true },
     { sku: 'FX-IN-3302', motivo: 'Costura abierta', evidencia: false },
   ])
+  // Autorización de supervisor (solo Tienda) previa a generar el folio.
+  const [authOpen, setAuthOpen] = useState(false)
+  const [authCode, setAuthCode] = useState('')
+  const [authError, setAuthError] = useState('')
 
   if (!type) {
     return (
@@ -116,6 +121,34 @@ export default function NewReturn() {
   const isLast = step === steps.length - 1
 
   const allComplete = prods.every((p) => p.sku && p.motivo && p.evidencia)
+
+  // Destino tras generar el folio (prototipo con datos de ejemplo).
+  const destino =
+    type === 'masiva' ? '/masivas' : type === 'depuracion' ? '/devoluciones/DEV-2026-000146' : '/devoluciones/DEV-2026-000154'
+
+  // Tienda requiere autorización de supervisor antes de generar el folio.
+  function onGenerar() {
+    if (role === 'tienda') {
+      setAuthCode('')
+      setAuthError('')
+      setAuthOpen(true)
+      return
+    }
+    navigate(destino)
+  }
+
+  function confirmarAutorizacion() {
+    const sup = supervisorByCode(authCode.trim())
+    if (!sup) {
+      setAuthError('Código no válido. Solicita el código de un supervisor autorizado.')
+      return
+    }
+    setAuthOpen(false)
+    // Pasa la autorización al expediente para registrarla en el historial.
+    navigate(destino, {
+      state: { auth: { supervisor: sup.name, sucursal: sup.sucursal, fecha: 'Hoy', hora: 'ahora' } },
+    })
+  }
 
   return (
     <div className="mx-auto max-w-[860px] px-4 py-6 lg:px-8">
@@ -374,15 +407,7 @@ export default function NewReturn() {
               variant="primary"
               icon={<Check className="h-4 w-4" />}
               disabled={isDepMasiva && !allComplete}
-              onClick={() =>
-                navigate(
-                  type === 'masiva'
-                    ? '/masivas'
-                    : type === 'depuracion'
-                    ? '/devoluciones/DEV-2026-000146'
-                    : '/devoluciones/DEV-2026-000154',
-                )
-              }
+              onClick={onGenerar}
             >
               {type === 'masiva' ? 'Generar expedientes' : isDepMasiva ? 'Generar folio principal' : 'Crear expediente'}
             </Button>
@@ -393,6 +418,47 @@ export default function NewReturn() {
           )}
         </div>
       </Card>
+
+      {/* Autorización de supervisor (solo Tienda) — previa a generar el folio */}
+      {authOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-6" onClick={() => setAuthOpen(false)}>
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-pop" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-brand-600" />
+              <h3 className="text-base font-semibold text-slate-900">Autorización de supervisor</h3>
+            </div>
+            <p className="mt-1 text-sm text-slate-500">
+              Antes de generar el folio, ingresa el código de 4 dígitos de un supervisor autorizado de la sucursal.
+            </p>
+
+            <label className="mt-4 block">
+              <span className="mb-1.5 block text-sm font-medium text-slate-700">Código de autorización</span>
+              <input
+                autoFocus
+                inputMode="numeric"
+                maxLength={4}
+                value={authCode}
+                onChange={(e) => { setAuthCode(e.target.value.replace(/\D/g, '')); setAuthError('') }}
+                onKeyDown={(e) => { if (e.key === 'Enter') confirmarAutorizacion() }}
+                placeholder="••••"
+                className={cn(
+                  'w-full rounded-lg border bg-white py-2.5 px-3 text-center font-mono text-2xl tracking-[0.5em] focus:outline-none focus:ring-2',
+                  authError ? 'border-rose-300 focus:ring-rose-100' : 'border-slate-200 focus:border-brand-300 focus:ring-brand-100',
+                )}
+              />
+            </label>
+            {authError && <p className="mt-2 text-xs font-medium text-rose-600">{authError}</p>}
+            <p className="mt-2 text-[11px] text-slate-400">Demo: 4821 · 6238 · 3097 · 7410 · 5566</p>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setAuthOpen(false)}>Cancelar</Button>
+              <Button variant="primary" icon={<ShieldCheck className="h-4 w-4" />} disabled={authCode.length !== 4} onClick={confirmarAutorizacion}>
+                Autorizar y generar folio
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

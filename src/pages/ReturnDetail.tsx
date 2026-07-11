@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import {
   ChevronLeft,
   Check,
@@ -113,8 +113,11 @@ const ACTION_ORDER: ActionKey[] = [
 export default function ReturnDetail() {
   const { folio } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, role } = useRole()
   const data = folio ? findReturn(folio) : undefined
+  // Autorización de supervisor recibida al generar el folio (regla de Tienda).
+  const auth = (location.state as { auth?: { supervisor: string; sucursal: string; fecha: string; hora: string } } | null)?.auth
   const [comments, setComments] = useState<Comment[]>(data?.comments ?? [])
   const [draft, setDraft] = useState('')
   const [preview, setPreview] = useState<string | null>(null)
@@ -122,8 +125,25 @@ export default function ReturnDetail() {
   const [showResPicker, setShowResPicker] = useState(false)
   // Estatus reactivo (prototipo): las acciones lo cambian y se refleja en la UI.
   const [status, setStatus] = useState<StatusKey>(data?.status ?? 'nuevo')
-  const [events, setEvents] = useState<TimelineEvent[]>(data?.timeline ?? [])
-  const [banner, setBanner] = useState<{ kind: 'success' | 'danger' | 'info'; text: string } | null>(null)
+  const [events, setEvents] = useState<TimelineEvent[]>(() => {
+    const base = data?.timeline ?? []
+    if (auth) {
+      return [
+        ...base,
+        {
+          date: auth.fecha,
+          time: auth.hora,
+          actor: auth.supervisor,
+          text: `autorizó la generación del folio (Supervisor · ${auth.sucursal})`,
+          kind: 'status',
+        },
+      ]
+    }
+    return base
+  })
+  const [banner, setBanner] = useState<{ kind: 'success' | 'danger' | 'info'; text: string } | null>(
+    auth ? { kind: 'success', text: `Folio generado · Autorizado por ${auth.supervisor} (${auth.sucursal})` } : null,
+  )
   const [rejectOpen, setRejectOpen] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [pendingAfterRes, setPendingAfterRes] = useState<ActionKey | null>(null)

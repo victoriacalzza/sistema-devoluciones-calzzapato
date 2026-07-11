@@ -172,6 +172,29 @@ export const ADMIN_USER: Person = PEOPLE[5]
 /** Personas del selector de demo (incluye el subrol Administrador de Compras). */
 export const DEMO_PERSONAS: Person[] = [PEOPLE[0], PEOPLE[6], PEOPLE[2], PEOPLE[5]]
 
+// -------------------- Supervisores de sucursal (autorización) --------------
+// Regla de negocio (solo Tienda): antes de generar el folio del expediente se
+// requiere el código de 4 dígitos de un supervisor autorizado de la sucursal.
+
+export interface Supervisor {
+  code: string
+  name: string
+  sucursal: string
+}
+
+export const SUPERVISORES: Supervisor[] = [
+  { code: '4821', name: 'Laura Beltrán', sucursal: 'Culiacán Centro' },
+  { code: '3097', name: 'Ramón Cázares', sucursal: 'Guadalajara Andares' },
+  { code: '7410', name: 'Patricia Nava', sucursal: 'Los Mochis Plaza' },
+  { code: '5566', name: 'Hugo Terán', sucursal: 'Mazatlán Marina' },
+  { code: '6238', name: 'Elena Ruvalcaba', sucursal: 'Culiacán Forum' },
+]
+
+/** Valida el código de autorización y devuelve al supervisor, si existe. */
+export function supervisorByCode(code: string): Supervisor | undefined {
+  return SUPERVISORES.find((s) => s.code === code)
+}
+
 export const SUCURSALES = [
   'Culiacán Centro',
   'Culiacán Forum',
