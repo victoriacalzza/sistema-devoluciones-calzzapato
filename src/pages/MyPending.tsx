@@ -33,7 +33,7 @@ export default function MyPending() {
         <div className="flex items-center justify-between px-5 py-4">
           <div>
             <h3 className="text-sm font-semibold text-slate-900">Requieren tu acción</h3>
-            <p className="text-xs text-slate-400">Ordenado por SLA restante · área {user.role}</p>
+            <p className="text-xs text-slate-500">Ordenado por SLA restante · área {user.role}</p>
           </div>
           <Button size="sm" variant="ghost" onClick={() => navigate('/devoluciones')}>Ver bandeja completa</Button>
         </div>
@@ -51,14 +51,14 @@ export default function MyPending() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs font-semibold text-slate-900">{r.folio}</span>
-                    <span className="text-xs text-slate-400">{RETURN_TYPES[r.tipo].short}</span>
+                    <span className="text-xs text-slate-500">{RETURN_TYPES[r.tipo].short}</span>
                     {r.outOfSla && <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold text-brand-600">Fuera de SLA</span>}
                   </div>
                   <p className="mt-0.5 truncate text-sm text-slate-500">
                     <span className="font-medium text-slate-600">{own.nextAction}</span> · {r.sucursal}
                   </p>
                 </div>
-                <div className="hidden items-center gap-1 text-xs text-slate-400 sm:flex">
+                <div className="hidden items-center gap-1 text-xs text-slate-500 sm:flex">
                   <Clock className="h-3.5 w-3.5" />
                   <span className={cn(r.outOfSla && 'font-medium text-brand-600')}>{r.slaDue}</span>
                 </div>
@@ -70,7 +70,7 @@ export default function MyPending() {
             )
           })}
           {requiere.length === 0 && (
-            <div className="py-16 text-center text-sm text-slate-400">
+            <div className="py-16 text-center text-sm text-slate-500">
               No tienes casos esperando tu acción como <span className="font-medium text-slate-600">{user.role}</span>. 🎉
             </div>
           )}

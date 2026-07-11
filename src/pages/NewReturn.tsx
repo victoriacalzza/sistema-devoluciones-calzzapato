@@ -43,7 +43,7 @@ function Field({ label, children, required }: { label: string; children: React.R
 }
 
 const inputCls =
-  'w-full rounded-lg border border-slate-200 bg-white py-2.5 px-3 text-sm placeholder:text-slate-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100'
+  'w-full rounded-lg border border-slate-200 bg-white py-2.5 px-3 text-sm placeholder:text-slate-500 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100'
 
 interface DepProd {
   sku: string
@@ -130,10 +130,10 @@ export default function NewReturn() {
       <div className="mb-6 flex items-center gap-2">
         {steps.map((s, i) => (
           <div key={s} className="flex flex-1 items-center gap-2">
-            <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold', i < step ? 'bg-emerald-500 text-white' : i === step ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-400')}>
+            <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold', i < step ? 'bg-emerald-500 text-white' : i === step ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-500')}>
               {i < step ? <Check className="h-4 w-4" /> : i + 1}
             </span>
-            <span className={cn('text-sm font-medium', i === step ? 'text-slate-900' : 'text-slate-400')}>{s}</span>
+            <span className={cn('text-sm font-medium', i === step ? 'text-slate-900' : 'text-slate-500')}>{s}</span>
             {i < steps.length - 1 && <span className="h-px flex-1 bg-slate-200" />}
           </div>
         ))}
@@ -251,7 +251,7 @@ export default function NewReturn() {
                         <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold text-brand-600">Incompleto</span>
                       )}
                       {prods.length > 1 && (
-                        <button onClick={() => setProds((arr) => arr.filter((_, j) => j !== i))} className="text-slate-400 hover:text-brand-600">
+                        <button onClick={() => setProds((arr) => arr.filter((_, j) => j !== i))} className="text-slate-500 hover:text-brand-600">
                           <Trash2 className="h-4 w-4" />
                         </button>
                       )}
@@ -325,7 +325,7 @@ export default function NewReturn() {
               <img src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&q=80" className="h-14 w-14 rounded-lg object-cover" alt="" />
               <div className="text-sm">
                 <div className="font-medium text-slate-900">Nike Air Jordan 1 Mid — Negro/Rojo</div>
-                <div className="text-slate-400">Autocompletado desde catálogo · $3,299</div>
+                <div className="text-slate-500">Autocompletado desde catálogo · $3,299</div>
               </div>
               <Check className="ml-auto h-5 w-5 text-emerald-500" />
             </div>
@@ -348,7 +348,7 @@ export default function NewReturn() {
               <div className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-10 text-center hover:border-brand-300">
                 <Upload className="h-8 w-8 text-slate-300" />
                 <span className="text-sm font-medium text-slate-600">Arrastra tus fotos aquí</span>
-                <span className="text-xs text-slate-400">o haz clic para seleccionar · PNG, JPG hasta 10 MB</span>
+                <span className="text-xs text-slate-500">o haz clic para seleccionar · PNG, JPG hasta 10 MB</span>
               </div>
             </Field>
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
@@ -357,7 +357,7 @@ export default function NewReturn() {
                   <img src={`https://images.unsplash.com/${id}?w=200&q=80`} className="h-full w-full object-cover" alt="" />
                 </div>
               ))}
-              <div className="flex aspect-square flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 text-slate-400">
+              <div className="flex aspect-square flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 text-slate-500">
                 <ImageIcon className="h-6 w-6" />
               </div>
             </div>

@@ -38,7 +38,7 @@ export default function Kanban({ rows }: { rows: ReturnCase[] }) {
                           <p className="line-clamp-2 text-xs text-slate-600">{r.product.descripcion}</p>
                         </div>
                         <div className="mt-3 flex items-center justify-between">
-                          <span className="truncate text-[11px] text-slate-400">{r.sucursal}</span>
+                          <span className="truncate text-[11px] text-slate-500">{r.sucursal}</span>
                           <Avatar person={resp} size="sm" />
                         </div>
                       </button>
@@ -46,7 +46,7 @@ export default function Kanban({ rows }: { rows: ReturnCase[] }) {
                   )
                 })}
                 {items.length === 0 && (
-                  <div className="rounded-lg border border-dashed border-slate-200 py-6 text-center text-xs text-slate-400">
+                  <div className="rounded-lg border border-dashed border-slate-200 py-6 text-center text-xs text-slate-500">
                     Sin casos
                   </div>
                 )}

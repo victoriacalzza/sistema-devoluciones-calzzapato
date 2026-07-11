@@ -25,6 +25,42 @@ body {
   margin: 0;
   background: #f8fafc;
   color: #0f172a;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+}
+
+/* ------------------------------------------------------------------ */
+/* Accesibilidad (WCAG 2.1 AA)                                         */
+/* ------------------------------------------------------------------ */
+
+/* 2.4.7 Foco visible: indicador claro y consistente en todo elemento
+   interactivo, con contraste suficiente sobre fondos claros y rojos. */
+:focus-visible {
+  outline: 2px solid #b71c1c; /* brand-800 */
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+/* Evita el doble anillo cuando el foco no proviene del teclado. */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* 1.4.3 Contraste: placeholders legibles (slate-500 ≈ 4.8:1). */
+::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+
+/* 2.3.3 Movimiento: respeta "reduce motion" del sistema. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Thin, unobtrusive scrollbars */

@@ -93,12 +93,12 @@ export default function Inbox() {
       <Card className="mb-4" padded={false}>
         <div className="flex flex-wrap items-center gap-3 p-3">
           <div className="relative min-w-[220px] flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Buscar folio, cliente, SKU, producto…"
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm placeholder:text-slate-400 focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100"
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm placeholder:text-slate-500 focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100"
             />
           </div>
           <select
@@ -161,21 +161,25 @@ export default function Inbox() {
                   <tr
                     key={r.folio}
                     onClick={() => navigate(`/devoluciones/${r.folio}`)}
-                    className="cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50"
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/devoluciones/${r.folio}`) } }}
+                    tabIndex={0}
+                    role="link"
+                    aria-label={`Abrir expediente ${r.folio}`}
+                    className="cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50 focus-visible:bg-slate-50"
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono text-xs font-semibold text-slate-900">{r.folio}</span>
                         {r.outOfSla && <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold text-brand-600">SLA</span>}
                       </div>
-                      <div className="truncate text-[11px] text-slate-400">{RETURN_TYPES[r.tipo].short}</div>
+                      <div className="truncate text-[11px] text-slate-500">{RETURN_TYPES[r.tipo].short}</div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <img src={r.product.image} alt="" className="h-8 w-8 shrink-0 rounded-md object-cover" />
                         <div className="min-w-0">
                           <div className="truncate text-slate-700">{r.product.descripcion}</div>
-                          <div className="truncate font-mono text-[11px] text-slate-400">{r.product.sku}</div>
+                          <div className="truncate font-mono text-[11px] text-slate-500">{r.product.sku}</div>
                         </div>
                       </div>
                     </td>
@@ -195,7 +199,7 @@ export default function Inbox() {
             </tbody>
           </table>
           {rows.length === 0 && (
-            <div className="py-16 text-center text-sm text-slate-400">No hay devoluciones que coincidan con los filtros.</div>
+            <div className="py-16 text-center text-sm text-slate-500">No hay devoluciones que coincidan con los filtros.</div>
           )}
         </Card>
       )}

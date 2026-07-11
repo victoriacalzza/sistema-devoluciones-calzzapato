@@ -69,7 +69,7 @@ function InfoRow({ label, value, mono }: { label: string; value: React.ReactNode
 function Meta({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
     <div className="min-w-0">
-      <div className="text-[11px] text-slate-400">{label}</div>
+      <div className="text-[11px] text-slate-500">{label}</div>
       <div className={cn('truncate text-sm font-medium text-slate-900', mono && 'font-mono text-xs')}>{value}</div>
     </div>
   )
@@ -299,29 +299,29 @@ export default function ReturnDetail() {
                   <h4 className="text-base font-semibold text-slate-900">{data.product.descripcion}</h4>
                   <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
                     <div>
-                      <div className="text-xs text-slate-400">SKU</div>
+                      <div className="text-xs text-slate-500">SKU</div>
                       <div className="font-mono text-sm text-slate-900">{data.product.sku}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-slate-400">Talla</div>
+                      <div className="text-xs text-slate-500">Talla</div>
                       <div className="text-sm text-slate-900">{data.product.talla}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-slate-400">Color</div>
+                      <div className="text-xs text-slate-500">Color</div>
                       <div className="text-sm text-slate-900">{data.product.color}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-slate-400">Cantidad</div>
+                      <div className="text-xs text-slate-500">Cantidad</div>
                       <div className="text-sm font-semibold text-slate-900">{data.product.cantidad}</div>
                     </div>
                     {showCost && (
                       <>
                         <div>
-                          <div className="text-xs text-slate-400">Precio unitario</div>
+                          <div className="text-xs text-slate-500">Precio unitario</div>
                           <div className="text-sm text-slate-900">${data.product.precio.toLocaleString('es-MX')}</div>
                         </div>
                         <div>
-                          <div className="text-xs text-slate-400">Total</div>
+                          <div className="text-xs text-slate-500">Total</div>
                           <div className="text-sm font-semibold text-brand-600">
                             ${(data.product.precio * data.product.cantidad).toLocaleString('es-MX')}
                           </div>
@@ -335,7 +335,7 @@ export default function ReturnDetail() {
 
             {/* Evidences */}
             <Card>
-              <SectionTitle icon={<Images className="h-4 w-4" />} right={<span className="text-xs text-slate-400">{data.evidences.length} fotos · {data.documents.length} docs</span>}>
+              <SectionTitle icon={<Images className="h-4 w-4" />} right={<span className="text-xs text-slate-500">{data.evidences.length} fotos · {data.documents.length} docs</span>}>
                 Evidencias
               </SectionTitle>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -351,7 +351,7 @@ export default function ReturnDetail() {
                     </span>
                   </button>
                 ))}
-                <button className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-200 text-slate-400 hover:border-brand-300 hover:text-brand-500">
+                <button className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-200 text-slate-500 hover:border-brand-300 hover:text-brand-500">
                   <ImageIcon className="h-6 w-6" />
                   <span className="text-[11px] font-medium">Arrastra o sube</span>
                 </button>
@@ -362,7 +362,7 @@ export default function ReturnDetail() {
                     <div key={i} className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
                       <FileText className="h-4 w-4 text-brand-500" />
                       <span className="flex-1 text-sm text-slate-700">{d.name}</span>
-                      <span className="text-xs text-slate-400">{d.size}</span>
+                      <span className="text-xs text-slate-500">{d.size}</span>
                     </div>
                   ))}
                 </div>
@@ -374,7 +374,7 @@ export default function ReturnDetail() {
               <Card>
                 <SectionTitle
                   icon={<Layers className="h-4 w-4" />}
-                  right={<span className="text-xs text-slate-400">{data.subproductos.length} productos</span>}
+                  right={<span className="text-xs text-slate-500">{data.subproductos.length} productos</span>}
                 >
                   Productos del expediente
                 </SectionTitle>
@@ -387,7 +387,7 @@ export default function ReturnDetail() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-xs font-semibold text-slate-900">{sp.sku}</span>
-                            <span className="text-xs text-slate-400">·</span>
+                            <span className="text-xs text-slate-500">·</span>
                             <span className="truncate text-sm text-slate-600">{sp.descripcion}</span>
                           </div>
                           <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
@@ -404,7 +404,7 @@ export default function ReturnDetail() {
                     )
                   })}
                 </div>
-                <p className="mt-3 text-xs text-slate-400">
+                <p className="mt-3 text-xs text-slate-500">
                   El expediente no puede cerrarse mientras exista un producto sin SKU, motivo o evidencia fotográfica.
                 </p>
               </Card>
@@ -417,7 +417,7 @@ export default function ReturnDetail() {
               </div>
               <div className="max-h-[420px] space-y-4 overflow-y-auto px-5 pb-4">
                 {comments.length === 0 && (
-                  <p className="py-6 text-center text-sm text-slate-400">Aún no hay comentarios. Inicia la conversación del caso.</p>
+                  <p className="py-6 text-center text-sm text-slate-500">Aún no hay comentarios. Inicia la conversación del caso.</p>
                 )}
                 {comments.map((c) => {
                   const author = personById(c.authorId)
@@ -428,7 +428,7 @@ export default function ReturnDetail() {
                       <div className={cn('max-w-[80%]', mine && 'items-end text-right')}>
                         <div className={cn('flex items-center gap-2', mine && 'flex-row-reverse')}>
                           <span className="text-sm font-medium text-slate-900">{author.name}</span>
-                          <span className="text-[11px] text-slate-400">{c.time}</span>
+                          <span className="text-[11px] text-slate-500">{c.time}</span>
                         </div>
                         <div
                           className={cn(
@@ -452,19 +452,19 @@ export default function ReturnDetail() {
               <div className="border-t border-slate-100 p-3">
                 {canComment ? (
                   <div className="flex items-end gap-2 rounded-xl border border-slate-200 bg-white p-2 focus-within:border-brand-300 focus-within:ring-2 focus-within:ring-brand-100">
-                    <button className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100"><Paperclip className="h-4 w-4" /></button>
+                    <button className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"><Paperclip className="h-4 w-4" /></button>
                     <textarea
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
                       rows={1}
                       placeholder="Escribe un comentario… usa @ para mencionar"
-                      className="max-h-24 flex-1 resize-none bg-transparent py-1.5 text-sm placeholder:text-slate-400 focus:outline-none"
+                      className="max-h-24 flex-1 resize-none bg-transparent py-1.5 text-sm placeholder:text-slate-500 focus:outline-none"
                     />
                     <Button size="sm" variant="primary" icon={<Send className="h-4 w-4" />} onClick={send}>Enviar</Button>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center gap-2 rounded-xl bg-slate-50 py-3 text-xs text-slate-400">
+                  <div className="flex items-center justify-center gap-2 rounded-xl bg-slate-50 py-3 text-xs text-slate-500">
                     <Lock className="h-3.5 w-3.5" />
                     Tu rol no comenta en este expediente.
                   </div>
@@ -497,11 +497,11 @@ export default function ReturnDetail() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-lg border border-slate-100 px-3 py-2">
-                    <div className="text-[11px] text-slate-400">Fecha compromiso</div>
+                    <div className="text-[11px] text-slate-500">Fecha compromiso</div>
                     <div className="text-sm font-medium text-slate-900">{status === 'cerrado' || status === 'rechazado' ? '—' : '08 jul · 14:00'}</div>
                   </div>
                   <div className={cn('rounded-lg border px-3 py-2', data.outOfSla ? 'border-brand-100 bg-brand-50/50' : 'border-slate-100')}>
-                    <div className="text-[11px] text-slate-400">SLA restante</div>
+                    <div className="text-[11px] text-slate-500">SLA restante</div>
                     <div className={cn('flex items-center gap-1 text-sm font-semibold', data.outOfSla ? 'text-brand-600' : 'text-slate-900')}>
                       <Clock className="h-3.5 w-3.5" /> {data.slaDue}
                     </div>
@@ -528,24 +528,24 @@ export default function ReturnDetail() {
 
             {/* Existencias — globales y por sucursal */}
             <Card>
-              <SectionTitle icon={<Boxes className="h-4 w-4" />} right={<span className="font-mono text-xs text-slate-400">{data.lote}</span>}>
+              <SectionTitle icon={<Boxes className="h-4 w-4" />} right={<span className="font-mono text-xs text-slate-500">{data.lote}</span>}>
                 Existencias
               </SectionTitle>
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-lg border border-slate-100 px-3 py-2">
-                  <div className="text-[11px] text-slate-400">Total</div>
+                  <div className="text-[11px] text-slate-500">Total</div>
                   <div className="text-lg font-semibold text-slate-900">{existencias.total}</div>
                 </div>
                 <div className="rounded-lg border border-slate-100 px-3 py-2">
-                  <div className="text-[11px] text-slate-400">Disponible</div>
+                  <div className="text-[11px] text-slate-500">Disponible</div>
                   <div className="text-lg font-semibold text-emerald-600">{existencias.disponible}</div>
                 </div>
                 <div className="rounded-lg border border-slate-100 px-3 py-2">
-                  <div className="text-[11px] text-slate-400">En tránsito</div>
+                  <div className="text-[11px] text-slate-500">En tránsito</div>
                   <div className="text-lg font-semibold text-indigo-600">{existencias.transito}</div>
                 </div>
                 <div className="rounded-lg border border-slate-100 px-3 py-2">
-                  <div className="text-[11px] text-slate-400">Comprometida</div>
+                  <div className="text-[11px] text-slate-500">Comprometida</div>
                   <div className="text-lg font-semibold text-amber-600">{existencias.comprometida}</div>
                 </div>
               </div>
@@ -655,7 +655,7 @@ export default function ReturnDetail() {
                   <li key={i} className="relative">
                     <span className={cn('absolute -left-[26px] top-1 h-3 w-3 rounded-full ring-4 ring-white', TIMELINE_DOT[t.kind])} />
                     <div className="flex items-baseline gap-2">
-                      <span className="text-xs font-medium text-slate-400">{t.date}</span>
+                      <span className="text-xs font-medium text-slate-500">{t.date}</span>
                       <span className="font-mono text-xs font-semibold text-slate-700">{t.time}</span>
                     </div>
                     <p className="text-sm text-slate-600">
@@ -664,7 +664,7 @@ export default function ReturnDetail() {
                   </li>
                 ))}
               </ol>
-              <div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-3 text-xs text-slate-400">
+              <div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
                 <UserCircle2 className="h-4 w-4" />
                 Creado por {creador.name} · {creador.role}
               </div>

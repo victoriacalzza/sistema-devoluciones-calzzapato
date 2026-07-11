@@ -64,7 +64,7 @@ const tooltipStyle = {
 function ChartCard({ title, children, hint }: { title: string; children: React.ReactNode; hint?: string }) {
   return (
     <Card>
-      <SectionTitle right={hint ? <span className="text-xs text-slate-400">{hint}</span> : undefined}>{title}</SectionTitle>
+      <SectionTitle right={hint ? <span className="text-xs text-slate-500">{hint}</span> : undefined}>{title}</SectionTitle>
       <div className="h-60">{children}</div>
     </Card>
   )
@@ -92,8 +92,8 @@ function VBarChart({ title, data, color, hint }: { title: string; data: { name: 
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-          <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} interval={0} angle={-12} textAnchor="end" height={44} />
-          <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} interval={0} angle={-12} textAnchor="end" height={44} />
+          <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={tooltipStyle} cursor={{ fill: '#f8fafc' }} />
           <Bar dataKey="value" fill={color} radius={[6, 6, 0, 0]} barSize={26} name="Devoluciones" />
         </BarChart>
@@ -134,8 +134,8 @@ function AreaTrend({ title, data, hint }: { title: string; data: { name: string;
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-          <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+          <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={tooltipStyle} />
           <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2.5} fill="url(#autoriz)" name="Autorizaciones" />
         </AreaChart>
@@ -163,7 +163,7 @@ function CaseListCard({
     <Card padded={false}>
       <div className="flex items-center justify-between px-5 py-4">
         <div className="flex items-center gap-2">
-          {icon && <span className="text-slate-400">{icon}</span>}
+          {icon && <span className="text-slate-500">{icon}</span>}
           <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{cases.length}</span>
         </div>
@@ -186,7 +186,7 @@ function CaseListCard({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-xs font-semibold text-slate-900">{r.folio}</span>
-                  <span className="text-xs text-slate-400">{RETURN_TYPES[r.tipo].short}</span>
+                  <span className="text-xs text-slate-500">{RETURN_TYPES[r.tipo].short}</span>
                   {r.outOfSla && (
                     <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold text-brand-600">Fuera de SLA</span>
                   )}
@@ -195,14 +195,14 @@ function CaseListCard({
               </div>
               <div className="hidden text-right sm:block">
                 <div className="text-xs text-slate-500">{r.sucursal}</div>
-                <div className="text-[11px] text-slate-400">{r.motivo}</div>
+                <div className="text-[11px] text-slate-500">{r.motivo}</div>
               </div>
               <StatusBadge status={r.status} />
               <Avatar person={resp} size="sm" />
             </button>
           )
         })}
-        {cases.length === 0 && <div className="px-5 py-12 text-center text-sm text-slate-400">{emptyText}</div>}
+        {cases.length === 0 && <div className="px-5 py-12 text-center text-sm text-slate-500">{emptyText}</div>}
       </div>
     </Card>
   )
@@ -280,7 +280,7 @@ function RecentActivity({ cases }: { cases: ReturnCase[] }) {
               <p className="text-sm text-slate-600">
                 <span className="font-medium text-slate-900">{ev.actor}</span> {ev.text}
               </p>
-              <div className="mt-0.5 flex items-center gap-2 text-[11px] text-slate-400">
+              <div className="mt-0.5 flex items-center gap-2 text-[11px] text-slate-500">
                 <span className="font-mono font-medium text-slate-500">{folio}</span>
                 <span>·</span>
                 <span>{ev.date} · {ev.time}</span>
@@ -440,7 +440,7 @@ function ComprasDashboard() {
       </div>
 
       {/* Análisis operativos — mezcla de gráficas según el tipo de dato */}
-      <div className="mt-6 mb-2 px-1 text-xs font-medium uppercase tracking-wide text-slate-400">Análisis operativos</div>
+      <div className="mt-6 mb-2 px-1 text-xs font-medium uppercase tracking-wide text-slate-500">Análisis operativos</div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <HBarChart title="Productos con mayor incidencia" data={byProducto} color="#D32F2F" hint="Ranking" />
         <PieChartCard title="Motivos más frecuentes" data={byMotivo} hint="Composición" />

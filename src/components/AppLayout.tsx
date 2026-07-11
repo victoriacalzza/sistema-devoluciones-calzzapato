@@ -51,7 +51,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex h-full flex-col">
       <div className="px-5 py-5">
         <KelderLogo className="h-8 w-auto" />
-        <div className="mt-1.5 text-[11px] font-medium text-slate-400">Sistema de Devoluciones</div>
+        <div className="mt-1.5 text-[11px] font-medium text-slate-500">Sistema de Devoluciones</div>
       </div>
 
       <nav className="flex-1 space-y-0.5 px-3 py-2">
@@ -103,9 +103,9 @@ function RoleSwitcher({ dropUp = true }: { dropUp?: boolean }) {
         <Avatar person={user} />
         <div className="min-w-0 flex-1 leading-tight">
           <div className="truncate text-sm font-medium text-slate-900">{user.name}</div>
-          <div className="truncate text-[11px] text-slate-400">{user.role}</div>
+          <div className="truncate text-[11px] text-slate-500">{user.role}</div>
         </div>
-        <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', open && 'rotate-180')} />
+        <ChevronDown className={cn('h-4 w-4 text-slate-500 transition-transform', open && 'rotate-180')} />
       </button>
       {open && (
         <>
@@ -116,7 +116,7 @@ function RoleSwitcher({ dropUp = true }: { dropUp?: boolean }) {
               dropUp ? 'bottom-full left-0 mb-2 w-full' : 'right-0 top-full mt-2 w-64',
             )}
           >
-            <div className="border-b border-slate-100 px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+            <div className="border-b border-slate-100 px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
               Cambiar de rol (demo)
             </div>
             {DEMO_PERSONAS.map((p) => {
@@ -136,7 +136,7 @@ function RoleSwitcher({ dropUp = true }: { dropUp?: boolean }) {
                   <Avatar person={p} size="sm" />
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-medium text-slate-800">{p.name}</div>
-                    <div className="truncate text-[11px] text-slate-400">{p.role}</div>
+                    <div className="truncate text-[11px] text-slate-500">{p.role}</div>
                   </div>
                   {activo && <span className="h-2 w-2 rounded-full bg-brand-600" />}
                 </button>
@@ -174,14 +174,14 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
                 <span
                   className={cn(
                     'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
-                    n.unread ? 'bg-brand-50 text-brand-600' : 'bg-slate-100 text-slate-400',
+                    n.unread ? 'bg-brand-50 text-brand-600' : 'bg-slate-100 text-slate-500',
                   )}
                 >
                   <Icon className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className={cn('text-sm', n.unread ? 'font-medium text-slate-900' : 'text-slate-600')}>{n.text}</p>
-                  <span className="text-[11px] text-slate-400">{n.time}</span>
+                  <span className="text-[11px] text-slate-500">{n.time}</span>
                 </div>
                 {n.unread && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-600" />}
               </button>
@@ -211,7 +211,7 @@ function PortalLayout({ children }: { children: React.ReactNode }) {
       <header className="relative z-20 flex h-16 shrink-0 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur lg:px-8">
         <button onClick={() => navigate('/')} className="flex items-center gap-3">
           <KelderLogo className="h-8 w-auto" />
-          <span className="hidden text-[11px] font-medium text-slate-400 sm:inline">Portal de devoluciones</span>
+          <span className="hidden text-[11px] font-medium text-slate-500 sm:inline">Portal de devoluciones</span>
         </button>
 
         {!onHome && (
@@ -268,7 +268,7 @@ function ErpLayout({ children }: { children: React.ReactNode }) {
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-slate-900/40" onClick={() => setMobileOpen(false)} />
           <aside className="absolute left-0 top-0 h-full w-64 bg-white shadow-pop">
-            <button className="absolute right-3 top-4 text-slate-400" onClick={() => setMobileOpen(false)}>
+            <button className="absolute right-3 top-4 text-slate-500" onClick={() => setMobileOpen(false)}>
               <X className="h-5 w-5" />
             </button>
             <Sidebar onNavigate={() => setMobileOpen(false)} />
@@ -284,10 +284,10 @@ function ErpLayout({ children }: { children: React.ReactNode }) {
           </button>
 
           <div className="relative hidden max-w-md flex-1 sm:block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <input
               placeholder="Buscar folio, cliente, SKU…"
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm placeholder:text-slate-400 focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100"
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm placeholder:text-slate-500 focus:border-brand-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100"
             />
           </div>
 

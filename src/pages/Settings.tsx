@@ -48,7 +48,7 @@ export default function Settings() {
               <li key={r.role} className="flex items-center justify-between gap-3 py-3">
                 <div>
                   <div className="text-sm font-medium text-slate-900">{r.role}</div>
-                  <div className="text-xs text-slate-400">{r.perms}</div>
+                  <div className="text-xs text-slate-500">{r.perms}</div>
                 </div>
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">Configurar</span>
               </li>
@@ -65,7 +65,7 @@ export default function Settings() {
                   <Avatar person={p} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium text-slate-900">{p.name}</div>
-                    <div className="truncate text-xs text-slate-400">{p.role}</div>
+                    <div className="truncate text-xs text-slate-500">{p.role}</div>
                   </div>
                   <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">Activo</span>
                 </li>

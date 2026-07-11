@@ -66,20 +66,20 @@ export default function MassReturnDetail() {
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600"><Layers className="h-5 w-5" /></span>
           <div>
             <div className="font-mono text-sm font-semibold text-slate-900">{data.lote}</div>
-            <div className="text-xs text-slate-400">Lote</div>
+            <div className="text-xs text-slate-500">Lote</div>
           </div>
         </Card>
         <Card>
           <div className="text-2xl font-semibold text-slate-900">{t.pct}%</div>
-          <div className="text-xs text-slate-400">Cumplimiento</div>
+          <div className="text-xs text-slate-500">Cumplimiento</div>
         </Card>
         <Card>
           <div className="text-2xl font-semibold text-slate-900">{t.recibido}/{t.solicitado}</div>
-          <div className="text-xs text-slate-400">Unidades recibidas</div>
+          <div className="text-xs text-slate-500">Unidades recibidas</div>
         </Card>
         <Card>
           <div className="text-2xl font-semibold text-slate-900">{data.subs.length}</div>
-          <div className="text-xs text-slate-400">Sucursales</div>
+          <div className="text-xs text-slate-500">Sucursales</div>
         </Card>
       </div>
 
@@ -109,12 +109,16 @@ export default function MassReturnDetail() {
                   <tr
                     key={s.sucursal}
                     onClick={() => setOpenSucursal(s.sucursal)}
-                    className="cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50"
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenSucursal(s.sucursal) } }}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`Ver detalle de ${s.sucursal}`}
+                    className="cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50 focus-visible:bg-slate-50"
                   >
                     <td className="px-5 py-3 font-medium text-slate-800">{s.sucursal}</td>
                     <td className="px-3 py-3 text-right text-slate-700">{s.solicitado}</td>
                     <td className="px-3 py-3 text-right text-slate-700">{s.enviado}</td>
-                    <td className={cn('px-3 py-3 text-right font-medium', subPendiente(s) > 0 ? 'text-brand-600' : 'text-slate-400')}>{subPendiente(s)}</td>
+                    <td className={cn('px-3 py-3 text-right font-medium', subPendiente(s) > 0 ? 'text-brand-600' : 'text-slate-500')}>{subPendiente(s)}</td>
                     <td className="px-3 py-3">
                       <span className="flex items-center gap-1.5 text-slate-600"><Avatar person={resp} size="sm" /> {resp.name}</span>
                     </td>
@@ -143,15 +147,15 @@ export default function MassReturnDetail() {
 
             <div className="mt-5 grid grid-cols-3 gap-3">
               <div className="rounded-xl border border-slate-100 p-3">
-                <div className="flex items-center gap-1.5 text-[11px] text-slate-400"><Package className="h-3.5 w-3.5" /> Solicitado</div>
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-500"><Package className="h-3.5 w-3.5" /> Solicitado</div>
                 <div className="mt-1 text-xl font-semibold text-slate-900">{detalle.solicitado}</div>
               </div>
               <div className="rounded-xl border border-slate-100 p-3">
-                <div className="flex items-center gap-1.5 text-[11px] text-slate-400"><Send className="h-3.5 w-3.5" /> Enviado</div>
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-500"><Send className="h-3.5 w-3.5" /> Enviado</div>
                 <div className="mt-1 text-xl font-semibold text-slate-900">{detalle.enviado}</div>
               </div>
               <div className="rounded-xl border border-slate-100 p-3">
-                <div className="flex items-center gap-1.5 text-[11px] text-slate-400"><Clock className="h-3.5 w-3.5" /> Pendiente</div>
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-500"><Clock className="h-3.5 w-3.5" /> Pendiente</div>
                 <div className={cn('mt-1 text-xl font-semibold', subPendiente(detalle) > 0 ? 'text-brand-600' : 'text-slate-900')}>{subPendiente(detalle)}</div>
               </div>
             </div>
@@ -174,7 +178,7 @@ export default function MassReturnDetail() {
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-slate-400">Sin evidencias registradas todavía.</p>
+                <p className="text-sm text-slate-500">Sin evidencias registradas todavía.</p>
               )}
             </div>
 
@@ -186,7 +190,7 @@ export default function MassReturnDetail() {
                   <li key={i} className="relative">
                     <span className={cn('absolute -left-[26px] top-1 h-3 w-3 rounded-full ring-4 ring-white', TIMELINE_DOT[h.kind])} />
                     <div className="flex items-baseline gap-2">
-                      <span className="text-xs font-medium text-slate-400">{h.date}</span>
+                      <span className="text-xs font-medium text-slate-500">{h.date}</span>
                       <span className="font-mono text-xs font-semibold text-slate-700">{h.time}</span>
                     </div>
                     <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">{h.actor}</span> {h.text}</p>

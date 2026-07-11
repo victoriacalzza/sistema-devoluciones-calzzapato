@@ -39,13 +39,13 @@ export default function MassReturns() {
                       <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-500">{m.lote}</span>
                     </div>
                     <p className="mt-0.5 text-sm text-slate-500">{m.producto}</p>
-                    <p className="text-xs text-slate-400">{m.linea} · {m.marca} · {m.proveedor} · Creada {m.creada}</p>
+                    <p className="text-xs text-slate-500">{m.linea} · {m.marca} · {m.proveedor} · Creada {m.creada}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="sm:text-right">
                     <div className="text-2xl font-semibold text-slate-900">{p.pct}%</div>
-                    <div className="text-xs text-slate-400">{p.rec} de {p.sol} unidades recibidas</div>
+                    <div className="text-xs text-slate-500">{p.rec} de {p.sol} unidades recibidas</div>
                   </div>
                   <ArrowRight className="hidden h-4 w-4 text-slate-300 sm:block" />
                 </div>
@@ -70,7 +70,7 @@ export default function MassReturns() {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Building2 className="h-4 w-4 text-slate-400" />
+                          <Building2 className="h-4 w-4 text-slate-500" />
                           <span className="text-sm font-medium text-slate-800">{s.sucursal}</span>
                         </div>
                         <StatusBadge status={s.status} />

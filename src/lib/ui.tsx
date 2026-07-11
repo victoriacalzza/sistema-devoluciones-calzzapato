@@ -45,7 +45,7 @@ export function SectionTitle({
   return (
     <div className="mb-4 flex items-center justify-between">
       <div className="flex items-center gap-2">
-        {icon && <span className="text-slate-400">{icon}</span>}
+        {icon && <span className="text-slate-500">{icon}</span>}
         <h3 className="text-sm font-semibold text-slate-900">{children}</h3>
       </div>
       {right}
@@ -188,7 +188,7 @@ export function KpiCard({
         {icon && <span className="text-slate-300">{icon}</span>}
       </div>
       <span className={cn('text-2xl font-semibold tracking-tight', accents[accent ?? 'default'])}>{value}</span>
-      {hint && <span className="text-xs text-slate-400">{hint}</span>}
+      {hint && <span className="text-xs text-slate-500">{hint}</span>}
     </Card>
   )
 }
