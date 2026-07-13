@@ -29,6 +29,9 @@ import {
   Boxes,
   Gavel,
   Layers,
+  Warehouse,
+  Play,
+  Video,
 } from 'lucide-react'
 import { Card, SectionTitle, StatusBadge, PriorityBadge, Avatar, Button, cn } from '../lib/ui'
 import {
@@ -37,8 +40,11 @@ import {
   compradorForMarca,
   existenciasFor,
   RESOLUTIONS,
+  ALMACENES,
+  VIDEO_SAMPLE,
   RETURN_TYPES,
   type Comment,
+  type Evidence,
   type ResolutionKey,
   type StatusKey,
   type TimelineEvent,
@@ -120,9 +126,10 @@ export default function ReturnDetail() {
   const auth = (location.state as { auth?: { supervisor: string; sucursal: string; fecha: string; hora: string } } | null)?.auth
   const [comments, setComments] = useState<Comment[]>(data?.comments ?? [])
   const [draft, setDraft] = useState('')
-  const [preview, setPreview] = useState<string | null>(null)
+  const [preview, setPreview] = useState<Evidence | null>(null)
   const [resolucion, setResolucion] = useState<ResolutionKey | ''>(data?.resolucion ?? '')
   const [showResPicker, setShowResPicker] = useState(false)
+  const [almacen, setAlmacen] = useState<string>(data?.almacen ?? '')
   // Estatus reactivo (prototipo): las acciones lo cambian y se refleja en la UI.
   const [status, setStatus] = useState<StatusKey>(data?.status ?? 'nuevo')
   const [events, setEvents] = useState<TimelineEvent[]>(() => {
@@ -181,6 +188,7 @@ export default function ReturnDetail() {
   function applyAction(a: ActionKey) {
     switch (a) {
       case 'autorizar':
+        if (!almacen) { setBanner({ kind: 'danger', text: 'Selecciona el almacén destino antes de autorizar.' }); return }
         if (requiereResolucion && !resolucion) { setPendingAfterRes('autorizar'); setShowResPicker(true); return }
         if (requiereResolucion) {
           // Cliente: la resolución cierra el expediente (más ágil, sin "pendiente de cerrar").
@@ -353,27 +361,42 @@ export default function ReturnDetail() {
               </div>
             </Card>
 
-            {/* Evidences */}
+            {/* Evidences (fotos y videos) */}
             <Card>
-              <SectionTitle icon={<Images className="h-4 w-4" />} right={<span className="text-xs text-slate-500">{data.evidences.length} fotos · {data.documents.length} docs</span>}>
+              <SectionTitle
+                icon={<Images className="h-4 w-4" />}
+                right={
+                  <span className="text-xs text-slate-500">
+                    {data.evidences.filter((e) => e.kind !== 'video').length} fotos · {data.evidences.filter((e) => e.kind === 'video').length} videos · {data.documents.length} docs
+                  </span>
+                }
+              >
                 Evidencias
               </SectionTitle>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {data.evidences.map((e, i) => (
                   <button
                     key={i}
-                    onClick={() => setPreview(e.url)}
+                    onClick={() => setPreview(e)}
                     className="group relative aspect-square overflow-hidden rounded-xl border border-slate-200"
                   >
                     <img src={e.url} alt={e.label} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
-                    <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5 text-left text-[11px] font-medium text-white">
+                    {e.kind === 'video' && (
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/25">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-900">
+                          <Play className="h-4 w-4 fill-current" />
+                        </span>
+                      </span>
+                    )}
+                    <span className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5 text-left text-[11px] font-medium text-white">
+                      {e.kind === 'video' && <Video className="h-3 w-3" />}
                       {e.label}
                     </span>
                   </button>
                 ))}
                 <button className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-200 text-slate-500 hover:border-brand-300 hover:text-brand-500">
                   <ImageIcon className="h-6 w-6" />
-                  <span className="text-[11px] font-medium">Arrastra o sube</span>
+                  <span className="text-center text-[11px] font-medium">Sube fotos o videos</span>
                 </button>
               </div>
               {data.documents.length > 0 && (
@@ -459,7 +482,7 @@ export default function ReturnDetail() {
                           {renderMentions(c.text, mine)}
                           {c.attachment && (
                             <div className={cn('mt-2 flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs', mine ? 'bg-white/15' : 'bg-white')}>
-                              {c.attachment.kind === 'image' ? <ImageIcon className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
+                              {c.attachment.kind === 'image' ? <ImageIcon className="h-3.5 w-3.5" /> : c.attachment.kind === 'video' ? <Video className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
                               {c.attachment.name}
                             </div>
                           )}
@@ -472,7 +495,7 @@ export default function ReturnDetail() {
               <div className="border-t border-slate-100 p-3">
                 {canComment ? (
                   <div className="flex items-end gap-2 rounded-xl border border-slate-200 bg-white p-2 focus-within:border-brand-300 focus-within:ring-2 focus-within:ring-brand-100">
-                    <button className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"><Paperclip className="h-4 w-4" /></button>
+                    <button title="Adjuntar foto, video o documento" aria-label="Adjuntar foto, video o documento" className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"><Paperclip className="h-4 w-4" /></button>
                     <textarea
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
@@ -621,6 +644,32 @@ export default function ReturnDetail() {
               </Card>
             )}
 
+            {/* Almacén destino — obligatorio para que Compras autorice */}
+            {role === 'compras' && (
+              <Card className={cn(!almacen && status === 'revision' && 'border-amber-200 bg-amber-50/40')}>
+                <SectionTitle icon={<Warehouse className="h-4 w-4" />}>Almacén destino</SectionTitle>
+                {status === 'cerrado' || status === 'rechazado' ? (
+                  <div className="flex items-center gap-2 text-sm text-slate-700">
+                    <Warehouse className="h-4 w-4 text-slate-400" /> {almacen || '—'}
+                  </div>
+                ) : (
+                  <>
+                    <select
+                      value={almacen}
+                      onChange={(e) => setAlmacen(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 bg-white py-2 px-3 text-sm text-slate-700 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                    >
+                      <option value="">Selecciona el almacén…</option>
+                      {ALMACENES.map((a) => (
+                        <option key={a} value={a}>{a}</option>
+                      ))}
+                    </select>
+                    <p className="mt-2 text-[11px] text-slate-500">Obligatorio para autorizar el expediente.</p>
+                  </>
+                )}
+              </Card>
+            )}
+
             {/* AI insight — nota compacta */}
             <div className="flex items-start gap-2.5 rounded-xl border border-brand-100 bg-brand-50/40 px-3 py-2.5">
               <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
@@ -693,10 +742,21 @@ export default function ReturnDetail() {
         </div>
       </div>
 
-      {/* Image lightbox */}
+      {/* Lightbox de evidencia (foto o video) */}
       {preview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-6" onClick={() => setPreview(null)}>
-          <img src={preview} alt="" className="max-h-[85vh] max-w-[85vw] rounded-2xl object-contain shadow-pop" />
+          {preview.kind === 'video' ? (
+            <video
+              src={VIDEO_SAMPLE}
+              poster={preview.url}
+              controls
+              autoPlay
+              onClick={(e) => e.stopPropagation()}
+              className="max-h-[85vh] max-w-[85vw] rounded-2xl bg-black shadow-pop"
+            />
+          ) : (
+            <img src={preview.url} alt={preview.label} className="max-h-[85vh] max-w-[85vw] rounded-2xl object-contain shadow-pop" />
+          )}
         </div>
       )}
 

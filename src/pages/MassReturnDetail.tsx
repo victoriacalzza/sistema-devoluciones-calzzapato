@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Images,
   History,
+  Play,
 } from 'lucide-react'
 import { PageHeader } from '../components/AppLayout'
 import { Card, SectionTitle, StatusBadge, Avatar, Button, cn } from '../lib/ui'
@@ -173,6 +174,11 @@ export default function MassReturnDetail() {
                   {detalle.evidencias.map((e, i) => (
                     <div key={i} className="relative aspect-square overflow-hidden rounded-xl border border-slate-200">
                       <img src={e.url} alt={e.label} className="h-full w-full object-cover" />
+                      {e.kind === 'video' && (
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/25">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-slate-900"><Play className="h-3.5 w-3.5 fill-current" /></span>
+                        </span>
+                      )}
                       <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1 text-[10px] font-medium text-white">{e.label}</span>
                     </div>
                   ))}

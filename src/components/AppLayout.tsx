@@ -46,7 +46,11 @@ const NOTIF_ICON = {
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { role, admin } = useRole()
-  const visibleNav = NAV.filter((item) => canSeeNav(role, item.key, admin))
+  // Compras crea devoluciones solo desde "Devoluciones masivas"; se oculta el
+  // ítem "Nueva devolución" del menú (la ruta sigue accesible desde ahí).
+  const visibleNav = NAV.filter(
+    (item) => canSeeNav(role, item.key, admin) && !(role === 'compras' && item.key === 'nueva'),
+  )
   return (
     <div className="flex h-full flex-col">
       <div className="px-5 py-5">

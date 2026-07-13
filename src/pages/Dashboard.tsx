@@ -23,7 +23,6 @@ import {
   ClipboardCheck,
   Gauge,
   Plus,
-  Inbox,
   Truck,
   MessageSquareReply,
   Search,
@@ -48,7 +47,6 @@ import {
   type ReturnCase,
 } from '../data/mock'
 import { useRole } from '../lib/RoleContext'
-import { requiresActionFrom } from '../lib/permissions'
 
 // ---------------------------------------------------------------------------
 // Helpers de presentación reutilizables
@@ -354,7 +352,7 @@ function ActionCard({
 
 function OperationalPortal({ channel }: { channel: 'tienda' | 'ecommerce' }) {
   const navigate = useNavigate()
-  const { user, role } = useRole()
+  const { user } = useRole()
 
   const sucursal = user.role.includes('·') ? user.role.split('·')[1].trim() : ''
   const firstName = user.name.split(' ')[0]
@@ -364,7 +362,6 @@ function OperationalPortal({ channel }: { channel: 'tienda' | 'ecommerce' }) {
       ? RETURNS.filter((r) => r.tipo === 'ecommerce')
       : RETURNS.filter((r) => r.sucursal === sucursal || r.creadorId === user.id)
 
-  const pendientes = mine.filter((r) => requiresActionFrom(role, r))
   const infoPend = mine.filter((r) => r.status === 'esperando')
   const enTransito = mine.filter((r) => r.status === 'transito' || r.status === 'recibido')
   const rechazadas = mine.filter((r) => r.status === 'rechazado')
@@ -382,7 +379,6 @@ function OperationalPortal({ channel }: { channel: 'tienda' | 'ecommerce' }) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <ActionCard primary title="Nueva devolución" desc="Registra un nuevo expediente" icon={<Plus className="h-6 w-6" />} onClick={() => navigate('/nueva')} />
         <ActionCard title="Mis devoluciones" desc="Todos tus expedientes" icon={<Search className="h-6 w-6" />} onClick={() => navigate('/devoluciones')} />
-        <ActionCard title="Mis pendientes" desc="Requieren tu acción" icon={<Inbox className="h-6 w-6" />} badge={pendientes.length} onClick={() => navigate('/pendientes')} />
         <ActionCard title="Pendientes de información" desc="Compras te pidió datos" icon={<MessageSquareReply className="h-6 w-6" />} badge={infoPend.length} onClick={() => navigate('/devoluciones?status=esperando')} />
         <ActionCard title="Casos en tránsito" desc="Mercancía hacia CEDIS" icon={<Truck className="h-6 w-6" />} badge={enTransito.length} onClick={() => navigate('/devoluciones?status=transito')} />
         <ActionCard title="Casos rechazados" desc="Devoluciones no procedentes" icon={<XCircle className="h-6 w-6" />} badge={rechazadas.length} onClick={() => navigate('/devoluciones?status=rechazado')} />

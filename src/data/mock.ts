@@ -221,11 +221,12 @@ export const MOTIVOS = [
   'Daño en transporte',
 ]
 
-// -------------------- Catálogo Comprador · Línea · Marca -------------------
-// Base para la asignación automática del comprador responsable de un expediente
-// y para reportes / devoluciones masivas / identificación de responsables.
+// ------------ Catálogo Agrupación · Línea · Marca · Comprador --------------
+// Base para: asignación automática del comprador, devoluciones masivas,
+// validaciones operativas (no mezclar agrupaciones) y ownership.
 
 export interface CLMRow {
+  agrupacion: string
   linea: string
   marca: string
   proveedor: string
@@ -233,18 +234,22 @@ export interface CLMRow {
 }
 
 export const CATALOGO_CLM: CLMRow[] = [
-  { linea: 'Calzado Deportivo', marca: 'Nike', proveedor: 'Nike México', compradorId: 'u3' },
-  { linea: 'Calzado Deportivo', marca: 'Adidas', proveedor: 'Adidas México', compradorId: 'u3' },
-  { linea: 'Calzado Deportivo', marca: 'Skechers', proveedor: 'VF Corp', compradorId: 'u3' },
-  { linea: 'Calzado Confort', marca: 'Flexi', proveedor: 'Calzado Flexi S.A.', compradorId: 'u4' },
-  { linea: 'Calzado Confort', marca: 'Andrea', proveedor: 'Grupo Andrea', compradorId: 'u4' },
-  { linea: 'Accesorios', marca: 'Coach', proveedor: 'VF Corp', compradorId: 'u5' },
-  { linea: 'Accesorios', marca: 'Puma', proveedor: 'Puma LATAM', compradorId: 'u5' },
-  { linea: 'Accesorios', marca: 'Vans', proveedor: 'VF Corp', compradorId: 'u5' },
+  { agrupacion: 'Deportivo', linea: 'Basketball', marca: 'Nike', proveedor: 'Nike México', compradorId: 'u3' },
+  { agrupacion: 'Deportivo', linea: 'Running', marca: 'Adidas', proveedor: 'Adidas México', compradorId: 'u3' },
+  { agrupacion: 'Deportivo', linea: 'Walking', marca: 'Skechers', proveedor: 'VF Corp', compradorId: 'u3' },
+  { agrupacion: 'Confort', linea: 'Confort dama', marca: 'Flexi', proveedor: 'Calzado Flexi S.A.', compradorId: 'u4' },
+  { agrupacion: 'Confort', linea: 'Confort dama', marca: 'Andrea', proveedor: 'Grupo Andrea', compradorId: 'u4' },
+  { agrupacion: 'Casual', linea: 'Lifestyle', marca: 'Vans', proveedor: 'VF Corp', compradorId: 'u5' },
+  { agrupacion: 'Accesorios', linea: 'Bolsos', marca: 'Coach', proveedor: 'VF Corp', compradorId: 'u5' },
+  { agrupacion: 'Accesorios', linea: 'Deportivo', marca: 'Puma', proveedor: 'Puma LATAM', compradorId: 'u5' },
 ]
+
+/** Agrupaciones de línea (definidas con Compras). */
+export const AGRUPACIONES = Array.from(new Set(CATALOGO_CLM.map((r) => r.agrupacion)))
 
 export interface CompradorInfo {
   comprador: Person
+  agrupacion: string
   linea: string
   marca: string
   proveedor: string
@@ -254,8 +259,23 @@ export interface CompradorInfo {
 export function compradorForMarca(marca: string): CompradorInfo | undefined {
   const row = CATALOGO_CLM.find((r) => r.marca === marca)
   if (!row) return undefined
-  return { comprador: personById(row.compradorId), linea: row.linea, marca: row.marca, proveedor: row.proveedor }
+  return { comprador: personById(row.compradorId), agrupacion: row.agrupacion, linea: row.linea, marca: row.marca, proveedor: row.proveedor }
 }
+
+/** Agrupación de línea a la que pertenece una marca (para validar mezclas). */
+export function agrupacionForMarca(marca: string): string | undefined {
+  return CATALOGO_CLM.find((r) => r.marca === marca)?.agrupacion
+}
+
+// ------------------------- Almacenes destino -------------------------------
+// Compras elige obligatoriamente un almacén destino al autorizar (configurable).
+
+export const ALMACENES = [
+  'Almacén devolución proveedor',
+  'Almacén donación',
+  'Almacén devolución masiva',
+  'Almacén textil',
+]
 
 // ----------------------- Resoluciones (cliente) ----------------------------
 // Al autorizar una devolución de cliente, Compras debe elegir una resolución.
@@ -366,7 +386,7 @@ export interface Comment {
   authorId: string
   time: string
   text: string
-  attachment?: { name: string; kind: 'image' | 'doc' }
+  attachment?: { name: string; kind: 'image' | 'doc' | 'video' }
 }
 
 export interface Transfer {
@@ -377,6 +397,16 @@ export interface Transfer {
   fecha: string
   responsable: string
 }
+
+/** Evidencia adjunta a un expediente: foto o video. */
+export interface Evidence {
+  url: string
+  label: string
+  kind?: 'image' | 'video'
+}
+
+/** Video de muestra para evidencias tipo video (prototipo). */
+export const VIDEO_SAMPLE = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
 
 export interface ReturnCase {
   folio: string
@@ -407,7 +437,7 @@ export interface ReturnCase {
     color: string
     image: string
   }
-  evidences: { url: string; label: string }[]
+  evidences: Evidence[]
   documents: { name: string; size: string }[]
   comments: Comment[]
   timeline: TimelineEvent[]
@@ -416,6 +446,8 @@ export interface ReturnCase {
   resolucion?: ResolutionKey
   /** ID de venta (Ecommerce) — equivalente a la factura física de tienda. */
   idVenta?: string
+  /** Almacén destino elegido por Compras al autorizar (obligatorio para autorizar). */
+  almacen?: string
   /** Subregistros de una depuración masiva (cada producto con SKU, motivo y evidencia). */
   subproductos?: SubProducto[]
 }
@@ -475,9 +507,9 @@ export const RETURNS: ReturnCase[] = [
       image: IMG.sneakerRed,
     },
     evidences: [
-      { url: IMG.sneakerRed, label: 'Vista general' },
-      { url: IMG.boxShoes, label: 'Caja original' },
-      { url: IMG.running, label: 'Detalle suela' },
+      { url: IMG.sneakerRed, label: 'Vista general', kind: 'image' },
+      { url: IMG.boxShoes, label: 'Caja original', kind: 'image' },
+      { url: IMG.running, label: 'Video del defecto', kind: 'video' },
     ],
     documents: [
       { name: 'Factura_FA-CUL-88231.pdf', size: '124 KB' },
@@ -486,7 +518,7 @@ export const RETURNS: ReturnCase[] = [
     comments: [
       { id: 'c1', authorId: 'u1', time: '09:15', text: 'Cliente reporta que la suela se despegó a la semana de uso. Adjunto fotografías del defecto.', attachment: { name: 'suela_detalle.jpg', kind: 'image' } },
       { id: 'c2', authorId: 'u3', time: '10:05', text: '@Karen Ríos ¿puedes confirmar si el producto tiene el sello de garantía intacto? Necesitamos validar antes de autorizar.' },
-      { id: 'c3', authorId: 'u1', time: '10:22', text: 'Confirmado, el sello está intacto. Producto sin uso aparente de mal trato.' },
+      { id: 'c3', authorId: 'u1', time: '10:22', text: 'Confirmado, el sello está intacto. Adjunto un video mostrando el defecto en movimiento.', attachment: { name: 'video_sello.mp4', kind: 'video' } },
     ],
     timeline: [
       ev('05 jul', '09:12', 'Karen Ríos', 'creó el expediente', 'create'),
@@ -515,6 +547,7 @@ export const RETURNS: ReturnCase[] = [
     responsableId: 'u3',
     creadorId: 'u2',
     idVenta: 'EC-99120',
+    almacen: 'Almacén devolución proveedor',
     slaDue: 'Resuelto',
     outOfSla: false,
     product: {
@@ -730,6 +763,7 @@ export const RETURNS: ReturnCase[] = [
     responsableId: 'u4',
     creadorId: 'u2',
     idVenta: 'EC-98004',
+    almacen: 'Almacén devolución proveedor',
     slaDue: 'Fuera de SLA',
     outOfSla: true,
     product: {
@@ -846,7 +880,7 @@ export interface MassSub {
   responsableId: string
   fechaCompromiso: string
   status: StatusKey
-  evidencias: { url: string; label: string }[]
+  evidencias: Evidence[]
   historial: TimelineEvent[]
 }
 
@@ -880,7 +914,7 @@ export const MASS_RETURNS: MassReturn[] = [
     subs: [
       { sucursal: 'Culiacán Centro', solicitado: 12, enviado: 12, recibido: 12, responsableId: 'u1', fechaCompromiso: '06 jul 2026', status: 'recibido', evidencias: [{ url: IMG.boxShoes, label: 'Empaque de envío' }], historial: [ev('05 jul', '09:00', 'Karen Ríos', 'preparó el envío', 'attach'), ev('06 jul', '14:00', 'CEDIS Culiacán', 'recibió 12 uds.', 'receive')] },
       { sucursal: 'Culiacán Forum', solicitado: 8, enviado: 8, recibido: 8, responsableId: 'u1', fechaCompromiso: '06 jul 2026', status: 'recibido', evidencias: [{ url: IMG.boxShoes, label: 'Empaque' }], historial: [ev('06 jul', '15:30', 'CEDIS Culiacán', 'recibió 8 uds.', 'receive')] },
-      { sucursal: 'Mazatlán Marina', solicitado: 10, enviado: 6, recibido: 6, responsableId: 'u2', fechaCompromiso: '08 jul 2026', status: 'transito', evidencias: [{ url: IMG.sneakerRed, label: 'Producto' }], historial: [ev('07 jul', '10:00', 'Miguel Andrade', 'envió 6 de 10 uds.', 'transfer')] },
+      { sucursal: 'Mazatlán Marina', solicitado: 10, enviado: 6, recibido: 6, responsableId: 'u2', fechaCompromiso: '08 jul 2026', status: 'transito', evidencias: [{ url: IMG.sneakerRed, label: 'Video del lote', kind: 'video' }], historial: [ev('07 jul', '10:00', 'Miguel Andrade', 'envió 6 de 10 uds.', 'transfer')] },
       { sucursal: 'Guadalajara Andares', solicitado: 15, enviado: 0, recibido: 0, responsableId: 'u2', fechaCompromiso: '09 jul 2026', status: 'pendiente_traslado', evidencias: [], historial: [ev('05 jul', '09:00', 'Sistema', 'generó el subexpediente', 'create')] },
       { sucursal: 'Los Mochis Plaza', solicitado: 6, enviado: 6, recibido: 6, responsableId: 'u1', fechaCompromiso: '06 jul 2026', status: 'recibido', evidencias: [{ url: IMG.boxShoes, label: 'Empaque' }], historial: [ev('06 jul', '12:00', 'CEDIS Culiacán', 'recibió 6 uds.', 'receive')] },
       { sucursal: 'Hermosillo Sur', solicitado: 9, enviado: 0, recibido: 0, responsableId: 'u1', fechaCompromiso: '09 jul 2026', status: 'nuevo', evidencias: [], historial: [ev('05 jul', '09:00', 'Sistema', 'generó el subexpediente', 'create')] },

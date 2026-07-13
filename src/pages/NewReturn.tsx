@@ -14,11 +14,22 @@ import {
   Plus,
   Trash2,
   ShieldCheck,
+  Info,
   Image as ImageIcon,
 } from 'lucide-react'
 import { PageHeader } from '../components/AppLayout'
 import { Card, Button, cn } from '../lib/ui'
-import { RETURN_TYPES, SUCURSALES, MOTIVOS, MARCAS, LINEAS, supervisorByCode, type ReturnTypeKey } from '../data/mock'
+import {
+  RETURN_TYPES,
+  SUCURSALES,
+  MOTIVOS,
+  MARCAS,
+  AGRUPACIONES,
+  agrupacionForMarca,
+  existenciasFor,
+  supervisorByCode,
+  type ReturnTypeKey,
+} from '../data/mock'
 import { useRole } from '../lib/RoleContext'
 
 const TYPE_ICON: Record<ReturnTypeKey, typeof Store> = {
@@ -48,6 +59,7 @@ const inputCls =
 
 interface DepProd {
   sku: string
+  marca: string
   motivo: string
   evidencia: boolean
 }
@@ -55,19 +67,24 @@ interface DepProd {
 export default function NewReturn() {
   const navigate = useNavigate()
   const { role } = useRole()
-  // Tipos permitidos por rol: Ecommerce solo Ecommerce; Tienda todo menos masiva; Compras todo.
+  // Tipos permitidos por rol: Ecommerce solo Ecommerce; Tienda todo menos masiva; Compras solo Masiva.
   const allowed = ORDER.filter((k) => {
     if (role === 'ecommerce') return k === 'ecommerce'
     if (role === 'tienda') return k !== 'masiva'
-    return true
+    return k === 'masiva' // compras
   })
   const [type, setType] = useState<ReturnTypeKey | null>(allowed.length === 1 ? allowed[0] : null)
   const [step, setStep] = useState(0)
   const [depMode, setDepMode] = useState<'individual' | 'masiva'>('individual')
   const [prods, setProds] = useState<DepProd[]>([
-    { sku: 'FX-IN-3301', motivo: 'Defecto de fábrica', evidencia: true },
-    { sku: 'FX-IN-3302', motivo: 'Costura abierta', evidencia: false },
+    { sku: 'FX-IN-3301', marca: 'Flexi', motivo: 'Defecto de fábrica', evidencia: true },
+    { sku: 'FX-IN-3302', marca: 'Flexi', motivo: 'Costura abierta', evidencia: false },
   ])
+  // Devolución masiva (Compras): lote, agrupación, marca y sucursales a retirar.
+  const [mLote, setMLote] = useState('LT-NK-2291')
+  const [mAgrupacion, setMAgrupacion] = useState('Deportivo')
+  const [mMarca, setMMarca] = useState('Nike')
+  const [selSuc, setSelSuc] = useState<string[]>(() => existenciasFor('LT-NK-2291').porSucursal.map((e) => e.sucursal))
   // Autorización de supervisor (solo Tienda) previa a generar el folio.
   const [authOpen, setAuthOpen] = useState(false)
   const [authCode, setAuthCode] = useState('')
@@ -122,6 +139,33 @@ export default function NewReturn() {
 
   const allComplete = prods.every((p) => p.sku && p.motivo && p.evidencia)
 
+  // --- Validaciones de agrupación de línea (no mezclar líneas en un masivo) ---
+  const mExistencias = existenciasFor(mLote)
+  const mSelCount = mExistencias.porSucursal.filter((e) => selSuc.includes(e.sucursal)).length
+  // Masiva: la marca debe pertenecer a la agrupación seleccionada.
+  const masivaMismatch = agrupacionForMarca(mMarca) !== mAgrupacion
+  // Depuración masiva: todos los productos deben compartir la misma agrupación.
+  const depAgrupaciones = Array.from(new Set(prods.map((p) => agrupacionForMarca(p.marca))))
+  const depMasivaMismatch = depAgrupaciones.length > 1
+  const AGRUP_ERROR = 'Se detectaron productos pertenecientes a una línea diferente a la seleccionada. Corrija la selección para continuar.'
+
+  // ¿Se puede generar el folio en el paso final?
+  const canGenerate =
+    type === 'masiva'
+      ? !masivaMismatch && mSelCount > 0
+      : isDepMasiva
+      ? allComplete && !depMasivaMismatch
+      : true
+
+  function toggleSuc(sucursal: string) {
+    setSelSuc((cur) => (cur.includes(sucursal) ? cur.filter((s) => s !== sucursal) : [...cur, sucursal]))
+  }
+
+  // No permitir avanzar del paso que valida agrupación/selección.
+  const blockNext =
+    (type === 'masiva' && step === 0 && (masivaMismatch || mSelCount === 0)) ||
+    (isDepMasiva && step === 1 && (!allComplete || depMasivaMismatch))
+
   // Destino tras generar el folio (prototipo con datos de ejemplo).
   const destino =
     type === 'masiva' ? '/masivas' : type === 'depuracion' ? '/devoluciones/DEV-2026-000146' : '/devoluciones/DEV-2026-000154'
@@ -173,33 +217,83 @@ export default function NewReturn() {
       </div>
 
       <Card className="space-y-5">
-        {/* MASIVA — alta por lote / línea / marca */}
+        {/* MASIVA — alta por lote / agrupación / marca + existencias + selección */}
         {type === 'masiva' && step === 0 && (
           <>
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
               <Field label="Número de lote" required>
                 <div className="relative">
-                  <input className={inputCls} placeholder="LT-NK-2291" defaultValue="LT-NK-2291" />
+                  <input className={inputCls} placeholder="LT-NK-2291" value={mLote} onChange={(e) => setMLote(e.target.value)} />
                   <ScanLine className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
                 </div>
               </Field>
-              <Field label="Línea" required>
-                <select className={inputCls}>{LINEAS.map((l) => <option key={l}>{l}</option>)}</select>
+              <Field label="Agrupación de línea" required>
+                <select className={inputCls} value={mAgrupacion} onChange={(e) => setMAgrupacion(e.target.value)}>
+                  {AGRUPACIONES.map((a) => <option key={a}>{a}</option>)}
+                </select>
               </Field>
               <Field label="Marca" required>
-                <select className={inputCls}>{MARCAS.map((m) => <option key={m}>{m}</option>)}</select>
+                <select className={inputCls} value={mMarca} onChange={(e) => setMMarca(e.target.value)}>
+                  {MARCAS.map((m) => <option key={m}>{m}</option>)}
+                </select>
               </Field>
             </div>
-            <div className="rounded-lg border border-brand-100 bg-brand-50/50 p-4 text-sm text-slate-600">
-              Al confirmar, el sistema creará <span className="font-semibold text-brand-700">expedientes individuales por sucursal</span> con existencias del lote y mostrará el avance de cumplimiento de cada una.
+
+            {/* Validación de agrupación */}
+            {masivaMismatch && (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                {AGRUP_ERROR}
+              </div>
+            )}
+
+            {/* Existencias globales del lote */}
+            <div>
+              <div className="mb-2 text-sm font-medium text-slate-700">Existencias del lote</div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="rounded-lg border border-slate-100 px-3 py-2"><div className="text-[11px] text-slate-500">Total</div><div className="text-lg font-semibold text-slate-900">{mExistencias.total}</div></div>
+                <div className="rounded-lg border border-slate-100 px-3 py-2"><div className="text-[11px] text-slate-500">Disponible</div><div className="text-lg font-semibold text-emerald-600">{mExistencias.disponible}</div></div>
+                <div className="rounded-lg border border-slate-100 px-3 py-2"><div className="text-[11px] text-slate-500">En tránsito</div><div className="text-lg font-semibold text-indigo-600">{mExistencias.transito}</div></div>
+                <div className="rounded-lg border border-slate-100 px-3 py-2"><div className="text-[11px] text-slate-500">Comprometida</div><div className="text-lg font-semibold text-amber-600">{mExistencias.comprometida}</div></div>
+              </div>
+            </div>
+
+            {/* Selección de sucursales para retiro */}
+            <div>
+              <div className="mb-2 text-sm font-medium text-slate-700">Sucursales para el retiro</div>
+              <div className="overflow-hidden rounded-xl border border-slate-100">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-medium text-slate-500">
+                      <th className="px-3 py-2">Sucursal</th>
+                      <th className="px-3 py-2 text-right">Existencia</th>
+                      <th className="px-3 py-2 text-center">Retirar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mExistencias.porSucursal.map((e) => (
+                      <tr key={e.sucursal} className="border-b border-slate-50 last:border-0">
+                        <td className="px-3 py-2 text-slate-700">{e.sucursal}</td>
+                        <td className="px-3 py-2 text-right font-medium text-slate-900">{e.cantidad}</td>
+                        <td className="px-3 py-2 text-center">
+                          <input type="checkbox" checked={selSuc.includes(e.sucursal)} onChange={() => toggleSuc(e.sucursal)} className="h-4 w-4 accent-brand-600" />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">Se generará un expediente solo para las sucursales seleccionadas ({mSelCount}).</p>
             </div>
           </>
         )}
         {type === 'masiva' && step === 1 && (
           <div className="text-center">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><Layers className="h-7 w-7" /></div>
-            <h4 className="mt-3 text-base font-semibold text-slate-900">Se generarán 6 expedientes por sucursal</h4>
-            <p className="mt-1 text-sm text-slate-500">Culiacán Centro, Culiacán Forum, Mazatlán, Guadalajara, Los Mochis y Hermosillo.</p>
+            <h4 className="mt-3 text-base font-semibold text-slate-900">Se generarán {mSelCount} expedientes por sucursal</h4>
+            <p className="mt-1 text-sm text-slate-500">
+              {mExistencias.porSucursal.filter((e) => selSuc.includes(e.sucursal)).map((e) => e.sucursal).join(', ') || 'Ninguna sucursal seleccionada'}
+            </p>
+            <p className="mt-2 text-xs text-slate-400">Lote {mLote} · {mAgrupacion} · {mMarca}</p>
           </div>
         )}
 
@@ -243,14 +337,14 @@ export default function NewReturn() {
           <>
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-slate-700">Productos del expediente</span>
-              <Button size="sm" variant="secondary" icon={<Plus className="h-4 w-4" />} onClick={() => setProds((p) => [...p, { sku: '', motivo: MOTIVOS[0], evidencia: false }])}>
+              <Button size="sm" variant="secondary" icon={<Plus className="h-4 w-4" />} onClick={() => setProds((p) => [...p, { sku: '', marca: MARCAS[0], motivo: MOTIVOS[0], evidencia: false }])}>
                 Agregar producto
               </Button>
             </div>
             <div className="space-y-3">
               {prods.map((p, i) => (
                 <div key={i} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="relative">
                       <input
                         className={inputCls}
@@ -262,12 +356,20 @@ export default function NewReturn() {
                     </div>
                     <select
                       className={inputCls}
+                      value={p.marca}
+                      onChange={(e) => setProds((arr) => arr.map((x, j) => (j === i ? { ...x, marca: e.target.value } : x)))}
+                    >
+                      {MARCAS.map((m) => <option key={m}>{m}</option>)}
+                    </select>
+                    <select
+                      className={inputCls}
                       value={p.motivo}
                       onChange={(e) => setProds((arr) => arr.map((x, j) => (j === i ? { ...x, motivo: e.target.value } : x)))}
                     >
                       {MOTIVOS.map((m) => <option key={m}>{m}</option>)}
                     </select>
                   </div>
+                  <div className="mt-1.5 text-[11px] text-slate-500">Agrupación: {agrupacionForMarca(p.marca) ?? '—'}</div>
                   <div className="mt-2 flex items-center justify-between">
                     <button
                       onClick={() => setProds((arr) => arr.map((x, j) => (j === i ? { ...x, evidencia: !x.evidencia } : x)))}
@@ -293,10 +395,15 @@ export default function NewReturn() {
                 </div>
               ))}
             </div>
-            <div className={cn('rounded-lg border p-3 text-sm', allComplete ? 'border-emerald-100 bg-emerald-50/50 text-emerald-700' : 'border-amber-100 bg-amber-50/50 text-amber-700')}>
-              {allComplete
-                ? 'Todos los productos tienen SKU, motivo y evidencia. Listo para generar el folio principal.'
-                : 'Cada producto debe tener SKU, motivo y evidencia fotográfica para poder cerrar el expediente.'}
+            {depMasivaMismatch && (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                {AGRUP_ERROR}
+              </div>
+            )}
+            <div className={cn('rounded-lg border p-3 text-sm', allComplete && !depMasivaMismatch ? 'border-emerald-100 bg-emerald-50/50 text-emerald-700' : 'border-amber-100 bg-amber-50/50 text-amber-700')}>
+              {allComplete && !depMasivaMismatch
+                ? `Todos los productos comparten la agrupación “${depAgrupaciones[0]}” y tienen SKU, motivo y evidencia. Listo para generar el folio principal.`
+                : 'Cada producto debe tener SKU, marca, motivo y evidencia; y todos deben pertenecer a la misma agrupación de línea.'}
             </div>
           </>
         )}
@@ -363,11 +470,26 @@ export default function NewReturn() {
               <Check className="ml-auto h-5 w-5 text-emerald-500" />
             </div>
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-              <Field label="Cantidad"><input type="number" className={inputCls} defaultValue={1} /></Field>
+              <Field label="Cantidad">
+                {type === 'cliente' || type === 'ecommerce' ? (
+                  <input type="number" className={cn(inputCls, 'bg-slate-50 text-slate-500')} value={1} readOnly />
+                ) : (
+                  <input type="number" className={inputCls} defaultValue={1} min={1} />
+                )}
+              </Field>
               <Field label="Motivo" required>
                 <select className={inputCls}>{MOTIVOS.map((m) => <option key={m}>{m}</option>)}</select>
               </Field>
             </div>
+            {(type === 'cliente' || type === 'ecommerce') && (
+              <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-600">
+                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                <span>
+                  <span className="font-medium text-slate-700">1 artículo por devolución.</span> Si el mismo ticket tiene varios
+                  artículos, genera un expediente por artículo (un folio distinto para cada uno).
+                </span>
+              </div>
+            )}
             <Field label="Observaciones">
               <textarea rows={3} className={inputCls} placeholder="Describe el detalle del caso…" />
             </Field>
@@ -377,11 +499,11 @@ export default function NewReturn() {
         {/* NON-MASIVA single-product step 2: evidences */}
         {type !== 'masiva' && !isDepMasiva && step === 2 && (
           <>
-            <Field label="Fotografías del producto" required>
+            <Field label="Fotografías o videos del producto" required>
               <div className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-10 text-center hover:border-brand-300">
                 <Upload className="h-8 w-8 text-slate-300" />
-                <span className="text-sm font-medium text-slate-600">Arrastra tus fotos aquí</span>
-                <span className="text-xs text-slate-500">o haz clic para seleccionar · PNG, JPG hasta 10 MB</span>
+                <span className="text-sm font-medium text-slate-600">Arrastra tus fotos o videos aquí</span>
+                <span className="text-xs text-slate-500">o haz clic para seleccionar · PNG, JPG, MP4 hasta 50 MB</span>
               </div>
             </Field>
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
@@ -406,13 +528,13 @@ export default function NewReturn() {
             <Button
               variant="primary"
               icon={<Check className="h-4 w-4" />}
-              disabled={isDepMasiva && !allComplete}
+              disabled={!canGenerate}
               onClick={onGenerar}
             >
               {type === 'masiva' ? 'Generar expedientes' : isDepMasiva ? 'Generar folio principal' : 'Crear expediente'}
             </Button>
           ) : (
-            <Button variant="primary" icon={<ChevronRight className="h-4 w-4" />} onClick={() => setStep((s) => s + 1)}>
+            <Button variant="primary" icon={<ChevronRight className="h-4 w-4" />} disabled={blockNext} onClick={() => setStep((s) => s + 1)}>
               Siguiente
             </Button>
           )}

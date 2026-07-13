@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { Building2, Tags, Truck, ListChecks, Plus, Search, UserSquare2 } from 'lucide-react'
+import { Building2, Tags, Truck, ListChecks, Plus, Search, UserSquare2, Warehouse } from 'lucide-react'
 import { PageHeader } from '../components/AppLayout'
 import { Card, Avatar, Button, cn } from '../lib/ui'
-import { SUCURSALES, MARCAS, PROVEEDORES, CATEGORIAS, MOTIVOS, LINEAS, CATALOGO_CLM, personById } from '../data/mock'
+import { SUCURSALES, MARCAS, PROVEEDORES, CATEGORIAS, MOTIVOS, AGRUPACIONES, ALMACENES, CATALOGO_CLM, personById } from '../data/mock'
 
 const LIST_TABS = [
-  { key: 'compradores', label: 'Comprador · Línea · Marca', icon: UserSquare2, count: CATALOGO_CLM.length },
+  { key: 'compradores', label: 'Agrupación · Línea · Marca', icon: UserSquare2, count: CATALOGO_CLM.length },
+  { key: 'agrupaciones', label: 'Agrupaciones de línea', icon: ListChecks, data: AGRUPACIONES },
+  { key: 'almacenes', label: 'Almacenes destino', icon: Warehouse, data: ALMACENES },
   { key: 'sucursales', label: 'Sucursales', icon: Building2, data: SUCURSALES },
-  { key: 'lineas', label: 'Líneas', icon: ListChecks, data: LINEAS },
   { key: 'marcas', label: 'Marcas', icon: Tags, data: MARCAS },
   { key: 'proveedores', label: 'Proveedores', icon: Truck, data: PROVEEDORES },
   { key: 'categorias', label: 'Categorías', icon: ListChecks, data: CATEGORIAS },
@@ -65,6 +66,7 @@ export default function Catalogs() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-medium text-slate-500">
+                    <th className="px-4 py-2.5">Agrupación</th>
                     <th className="px-4 py-2.5">Línea</th>
                     <th className="px-4 py-2.5">Marca</th>
                     <th className="px-4 py-2.5">Proveedor</th>
@@ -76,6 +78,7 @@ export default function Catalogs() {
                     const c = personById(r.compradorId)
                     return (
                       <tr key={i} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
+                        <td className="px-4 py-3"><span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{r.agrupacion}</span></td>
                         <td className="px-4 py-3 text-slate-700">{r.linea}</td>
                         <td className="px-4 py-3 font-medium text-slate-900">{r.marca}</td>
                         <td className="px-4 py-3 text-slate-500">{r.proveedor}</td>

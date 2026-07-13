@@ -17,8 +17,23 @@ export default function MassReturns() {
       <PageHeader
         title="Devoluciones masivas"
         subtitle="Retiros de lote solicitados por Compras · avance de cumplimiento por sucursal"
-        actions={<Button variant="primary" size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => navigate('/nueva')}>Nueva masiva</Button>}
+        actions={<Button variant="primary" icon={<Plus className="h-5 w-5" />} onClick={() => navigate('/nueva')}>Nueva devolución masiva</Button>}
       />
+
+      {MASS_RETURNS.length === 0 && (
+        <Card className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+          <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
+            <Layers className="h-8 w-8" />
+          </span>
+          <h3 className="text-lg font-semibold text-slate-900">Aún no hay devoluciones masivas</h3>
+          <p className="max-w-sm text-sm text-slate-500">
+            Crea una campaña de retiro por lote, línea o marca y el sistema generará un expediente por sucursal.
+          </p>
+          <Button className="mt-2" variant="primary" icon={<Plus className="h-5 w-5" />} onClick={() => navigate('/nueva')}>
+            Crear tu primera devolución masiva
+          </Button>
+        </Card>
+      )}
 
       <div className="space-y-5">
         {MASS_RETURNS.map((m) => {
