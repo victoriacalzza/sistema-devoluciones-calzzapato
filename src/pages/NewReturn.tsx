@@ -430,11 +430,8 @@ export default function NewReturn() {
                   <input className={inputCls} placeholder="EC-99120" />
                 </Field>
                 <Field label="Cliente" required><input className={inputCls} placeholder="Nombre del cliente" /></Field>
-                <Field label="Tienda origen" required>
-                  <select className={inputCls}>{SUCURSALES.map((s) => <option key={s}>{s}</option>)}</select>
-                </Field>
                 <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
-                  El <span className="font-medium text-slate-700">ID de Venta</span> es obligatorio y funciona como el equivalente a la factura física utilizada en tienda.
+                  El <span className="font-medium text-slate-700">ID de Venta</span> es obligatorio y funciona como el equivalente a la factura física utilizada en tienda. Al ser compra en línea no aplica "tienda origen"; se registra la <span className="font-medium text-slate-700">sucursal</span> que atiende la devolución.
                 </div>
               </>
             )}

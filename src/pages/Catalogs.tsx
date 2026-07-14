@@ -7,7 +7,7 @@ import { SUCURSALES, MARCAS, PROVEEDORES, CATEGORIAS, MOTIVOS, AGRUPACIONES, ALM
 const LIST_TABS = [
   { key: 'compradores', label: 'Agrupación · Línea · Marca', icon: UserSquare2, count: CATALOGO_CLM.length },
   { key: 'agrupaciones', label: 'Agrupaciones de línea', icon: ListChecks, data: AGRUPACIONES },
-  { key: 'almacenes', label: 'Almacenes destino', icon: Warehouse, data: ALMACENES },
+  { key: 'almacenes', label: 'Almacenes destino', icon: Warehouse, count: ALMACENES.length },
   { key: 'sucursales', label: 'Sucursales', icon: Building2, data: SUCURSALES },
   { key: 'marcas', label: 'Marcas', icon: Tags, data: MARCAS },
   { key: 'proveedores', label: 'Proveedores', icon: Truck, data: PROVEEDORES },
@@ -88,6 +88,33 @@ export default function Catalogs() {
                       </tr>
                     )
                   })}
+                </tbody>
+              </table>
+            </div>
+          ) : tab === 'almacenes' ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-medium text-slate-500">
+                    <th className="px-4 py-2.5">Tipo de almacén</th>
+                    <th className="px-4 py-2.5">Línea de mercancía</th>
+                    <th className="px-4 py-2.5">Nombre</th>
+                    <th className="px-4 py-2.5">Estatus</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ALMACENES.map((a, i) => (
+                    <tr key={i} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        <span className="flex items-center gap-2 font-medium text-slate-900"><Warehouse className="h-4 w-4 text-slate-400" /> {a.tipo}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={cn('rounded-md px-2 py-0.5 text-xs font-medium', a.linea === 'General' ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-700')}>{a.linea}</span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">{a.nombre}</td>
+                      <td className="px-4 py-3"><span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">Activo</span></td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

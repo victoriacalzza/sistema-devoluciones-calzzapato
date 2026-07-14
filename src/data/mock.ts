@@ -270,12 +270,90 @@ export function agrupacionForMarca(marca: string): string | undefined {
 // ------------------------- Almacenes destino -------------------------------
 // Compras elige obligatoriamente un almacén destino al autorizar (configurable).
 
-export const ALMACENES = [
-  'Almacén devolución proveedor',
-  'Almacén donación',
-  'Almacén devolución masiva',
-  'Almacén textil',
+// -------------------- Catálogo de almacenes destino ------------------------
+// No existe un único almacén: hay varios tipos por destino/mercancía. El sistema
+// recomienda los compatibles con la LÍNEA del producto (calzado/accesorios/textil).
+// Administrable por Compras · Administrador.
+
+export type LineaMercancia = 'Calzado' | 'Accesorios' | 'Textil'
+
+export interface Almacen {
+  nombre: string
+  tipo: string
+  /** Línea de mercancía a la que aplica; "General" aplica a todas. */
+  linea: LineaMercancia | 'General'
+}
+
+export const ALMACENES: Almacen[] = [
+  // Calzado
+  { nombre: 'Centro de devoluciones calzado', tipo: 'Centro de devoluciones', linea: 'Calzado' },
+  { nombre: 'Choix calzado', tipo: 'Choix', linea: 'Calzado' },
+  { nombre: 'Donación calzado', tipo: 'Donación', linea: 'Calzado' },
+  { nombre: 'Redistribución calzado', tipo: 'Redistribución', linea: 'Calzado' },
+  // Accesorios
+  { nombre: 'Centro de devoluciones accesorios', tipo: 'Centro de devoluciones', linea: 'Accesorios' },
+  { nombre: 'Choix accesorios', tipo: 'Choix', linea: 'Accesorios' },
+  { nombre: 'Donación accesorios', tipo: 'Donación', linea: 'Accesorios' },
+  { nombre: 'Redistribución accesorios', tipo: 'Redistribución', linea: 'Accesorios' },
+  // Textil
+  { nombre: 'Centro de devoluciones textil', tipo: 'Centro de devoluciones', linea: 'Textil' },
+  { nombre: 'Choix textil', tipo: 'Choix', linea: 'Textil' },
+  { nombre: 'Donación textil', tipo: 'Donación', linea: 'Textil' },
+  { nombre: 'Redistribución textil', tipo: 'Redistribución', linea: 'Textil' },
+  // Generales (aplican a cualquier línea)
+  { nombre: 'Liquidaciones', tipo: 'Liquidaciones', linea: 'General' },
+  { nombre: 'Merma', tipo: 'Merma', linea: 'General' },
+  { nombre: 'Recuperable', tipo: 'Recuperable', linea: 'General' },
+  { nombre: 'No recuperable', tipo: 'No recuperable', linea: 'General' },
 ]
+
+/** Identifica la línea de mercancía del producto (por marca/categoría). */
+export function lineaMercancia(marca: string, categoria: string): LineaMercancia {
+  if (agrupacionForMarca(marca) === 'Accesorios' || categoria === 'Accesorios') return 'Accesorios'
+  if (categoria === 'Ropa' || categoria === 'Textil') return 'Textil'
+  return 'Calzado'
+}
+
+/** Almacenes recomendados (compatibles con la línea) y el resto ("Otros"). */
+export function almacenesRecomendados(linea: LineaMercancia): Almacen[] {
+  return ALMACENES.filter((a) => a.linea === linea)
+}
+export function otrosAlmacenes(linea: LineaMercancia): Almacen[] {
+  return ALMACENES.filter((a) => a.linea !== linea)
+}
+
+// -------------------- Resoluciones de autorización -------------------------
+// Al AUTORIZAR, Compras elige primero una resolución y luego el almacén destino.
+// La lista de almacenes depende de la resolución (catálogo configurable).
+
+export interface ResolucionOption {
+  key: string
+  label: string
+}
+
+/** Resoluciones para devoluciones de cliente (outcome hacia el cliente). */
+export const RESOLUCIONES_CLIENTE: ResolucionOption[] = [
+  { key: 'cambio_fisico', label: 'Cambio físico' },
+  { key: 'vale', label: 'Vale de compra' },
+  { key: 'reembolso', label: 'Reembolso' },
+  { key: 'bonificacion', label: 'Bonificación' },
+  { key: 'sustitucion', label: 'Sustitución por producto equivalente' },
+  { key: 'reparacion', label: 'Reparación' },
+]
+
+/** Resoluciones (disposición del producto) para el resto de tipos. */
+export const RESOLUCIONES_DESTINO: ResolucionOption[] = [
+  { key: 'proveedor', label: 'Devolución a proveedor' },
+  { key: 'donacion', label: 'Donación' },
+  { key: 'masiva', label: 'Devolución masiva' },
+  { key: 'redistribucion', label: 'Redistribución' },
+  { key: 'liquidacion', label: 'Liquidación' },
+]
+
+/** Resoluciones disponibles al autorizar, según el tipo de devolución. */
+export function resolucionesFor(tipo: ReturnTypeKey): ResolucionOption[] {
+  return tipo === 'cliente' ? RESOLUCIONES_CLIENTE : RESOLUCIONES_DESTINO
+}
 
 // ----------------------- Resoluciones (cliente) ----------------------------
 // Al autorizar una devolución de cliente, Compras debe elegir una resolución.

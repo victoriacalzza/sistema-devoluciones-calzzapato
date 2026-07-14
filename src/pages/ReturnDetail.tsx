@@ -32,6 +32,7 @@ import {
   Warehouse,
   Play,
   Video,
+  ChevronDown,
 } from 'lucide-react'
 import { Card, SectionTitle, StatusBadge, PriorityBadge, Avatar, Button, cn } from '../lib/ui'
 import {
@@ -40,17 +41,20 @@ import {
   compradorForMarca,
   existenciasFor,
   RESOLUTIONS,
-  ALMACENES,
+  resolucionesFor,
+  lineaMercancia,
+  almacenesRecomendados,
+  otrosAlmacenes,
   VIDEO_SAMPLE,
   RETURN_TYPES,
   type Comment,
   type Evidence,
-  type ResolutionKey,
+  type ResolucionOption,
   type StatusKey,
   type TimelineEvent,
 } from '../data/mock'
 import { useRole } from '../lib/RoleContext'
-import { allowedActions, ownershipFor, canSeeCost, needsResolution, type ActionKey } from '../lib/permissions'
+import { allowedActions, ownershipFor, canSeeCost, type ActionKey } from '../lib/permissions'
 
 // Motivos de rechazo (Compras debe elegir uno al rechazar).
 const REJECT_REASONS = [
@@ -127,9 +131,13 @@ export default function ReturnDetail() {
   const [comments, setComments] = useState<Comment[]>(data?.comments ?? [])
   const [draft, setDraft] = useState('')
   const [preview, setPreview] = useState<Evidence | null>(null)
-  const [resolucion, setResolucion] = useState<ResolutionKey | ''>(data?.resolucion ?? '')
-  const [showResPicker, setShowResPicker] = useState(false)
+  const [resolucion, setResolucion] = useState<string>(data?.resolucion ? RESOLUTIONS[data.resolucion] : '')
   const [almacen, setAlmacen] = useState<string>(data?.almacen ?? '')
+  // Asistente de autorización: Resolución (paso 1) → Almacén destino (paso 2).
+  const [authStep, setAuthStep] = useState<'res' | 'alm' | null>(null)
+  const [wizRes, setWizRes] = useState<ResolucionOption | null>(null)
+  const [wizAlmacen, setWizAlmacen] = useState('')
+  const [showOtros, setShowOtros] = useState(false)
   // Estatus reactivo (prototipo): las acciones lo cambian y se refleja en la UI.
   const [status, setStatus] = useState<StatusKey>(data?.status ?? 'nuevo')
   const [events, setEvents] = useState<TimelineEvent[]>(() => {
@@ -153,7 +161,6 @@ export default function ReturnDetail() {
   )
   const [rejectOpen, setRejectOpen] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
-  const [pendingAfterRes, setPendingAfterRes] = useState<ActionKey | null>(null)
 
   if (!data) {
     return (
@@ -173,7 +180,10 @@ export default function ReturnDetail() {
   const barActions = ACTION_ORDER.filter((a) => actions.includes(a) && ACTION_META[a])
   const comprador = compradorForMarca(data.marca)
   const existencias = existenciasFor(data.lote)
-  const requiereResolucion = needsResolution(data.tipo)
+  // Línea de mercancía del expediente → almacenes recomendados (compatibles) vs. otros.
+  const linea = lineaMercancia(data.marca, data.categoria)
+  const almRecomendados = almacenesRecomendados(linea)
+  const almOtros = otrosAlmacenes(linea)
 
   function logEvent(text: string, kind: TimelineEvent['kind']) {
     setEvents((e) => [...e, { date: 'Hoy', time: 'ahora', actor: user.name, text, kind }])
@@ -188,17 +198,13 @@ export default function ReturnDetail() {
   function applyAction(a: ActionKey) {
     switch (a) {
       case 'autorizar':
-        if (!almacen) { setBanner({ kind: 'danger', text: 'Selecciona el almacén destino antes de autorizar.' }); return }
-        if (requiereResolucion && !resolucion) { setPendingAfterRes('autorizar'); setShowResPicker(true); return }
-        if (requiereResolucion) {
-          // Cliente: la resolución cierra el expediente (más ágil, sin "pendiente de cerrar").
-          transition('cerrado', `autorizó y resolvió — ${RESOLUTIONS[resolucion as ResolutionKey]}`, 'success',
-            `Devolución resuelta y cerrada · ${RESOLUTIONS[resolucion as ResolutionKey]}`)
-        } else {
-          transition('autorizado', 'autorizó la devolución', 'success', 'Devolución autorizada')
-        }
+        // Abre el asistente: primero resolución, luego almacén (no antes).
+        setWizRes(null)
+        setWizAlmacen('')
+        setAuthStep('res')
         break
       case 'rechazar':
+        setRejectReason('')
         setRejectOpen(true)
         break
       case 'solicitar_info':
@@ -213,25 +219,29 @@ export default function ReturnDetail() {
       case 'generar_traslado':
         transition('transito', 'generó la devolución a proveedor', 'info', 'Devolución a proveedor generada')
         break
-      case 'cerrar':
-        if (requiereResolucion && !resolucion) { setPendingAfterRes('cerrar'); setShowResPicker(true); return }
-        transition('cerrado', 'cerró el expediente', 'success', 'Expediente cerrado')
-        break
       case 'imprimir':
         setBanner({ kind: 'info', text: 'Enviando expediente a impresión…' })
         break
     }
   }
 
-  function pickResolution(k: ResolutionKey) {
-    setResolucion(k)
-    setShowResPicker(false)
-    const pending = pendingAfterRes
-    setPendingAfterRes(null)
-    if (pending === 'autorizar') {
-      transition('cerrado', `autorizó y resolvió — ${RESOLUTIONS[k]}`, 'success', `Devolución resuelta y cerrada · ${RESOLUTIONS[k]}`)
-    } else if (pending === 'cerrar') {
-      transition('cerrado', 'cerró el expediente', 'success', 'Expediente cerrado')
+  // Paso 1 → 2 del asistente: elegir resolución habilita la lista de almacenes.
+  function chooseResolucion(opt: ResolucionOption) {
+    setWizRes(opt)
+    setWizAlmacen('')
+    setAuthStep('alm')
+  }
+
+  // Confirmación: requiere resolución y almacén; cliente cierra, el resto autoriza.
+  function confirmAuth() {
+    if (!data || !wizRes || !wizAlmacen) return
+    setResolucion(wizRes.label)
+    setAlmacen(wizAlmacen)
+    setAuthStep(null)
+    if (data.tipo === 'cliente') {
+      transition('cerrado', `autorizó y resolvió — ${wizRes.label} · destino ${wizAlmacen}`, 'success', `Devolución autorizada y resuelta · ${wizRes.label} → ${wizAlmacen}`)
+    } else {
+      transition('autorizado', `autorizó la devolución — ${wizRes.label} · destino ${wizAlmacen}`, 'success', `Devolución autorizada · ${wizRes.label} → ${wizAlmacen}`)
     }
   }
 
@@ -616,56 +626,23 @@ export default function ReturnDetail() {
               </div>
             </Card>
 
-            {/* Resolución — solo devoluciones de cliente */}
-            {requiereResolucion && (
-              <Card className={cn(!resolucion && 'border-amber-200 bg-amber-50/40')}>
-                <SectionTitle icon={<Gavel className="h-4 w-4" />}>Resolución</SectionTitle>
-                {resolucion ? (
-                  <div className="flex items-center justify-between gap-3 rounded-lg bg-emerald-50 px-3 py-2.5">
-                    <span className="flex items-center gap-2 text-sm font-medium text-emerald-700">
-                      <Check className="h-4 w-4" /> {RESOLUTIONS[resolucion]}
-                    </span>
-                    {role === 'compras' && status !== 'cerrado' && (
-                      <button onClick={() => setShowResPicker(true)} className="text-xs font-medium text-slate-500 hover:text-slate-800">Cambiar</button>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <p className="text-sm text-slate-500">
-                      Esta devolución de cliente requiere una resolución para poder autorizarse y cerrarse.
-                    </p>
-                    {role === 'compras' && (
-                      <Button className="mt-3" size="sm" variant="primary" icon={<Gavel className="h-4 w-4" />} onClick={() => setShowResPicker(true)}>
-                        Seleccionar resolución
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </Card>
-            )}
-
-            {/* Almacén destino — obligatorio para que Compras autorice */}
+            {/* Resolución y almacén destino — se definen al autorizar (solo lectura) */}
             {role === 'compras' && (
-              <Card className={cn(!almacen && status === 'revision' && 'border-amber-200 bg-amber-50/40')}>
-                <SectionTitle icon={<Warehouse className="h-4 w-4" />}>Almacén destino</SectionTitle>
-                {status === 'cerrado' || status === 'rechazado' ? (
-                  <div className="flex items-center gap-2 text-sm text-slate-700">
-                    <Warehouse className="h-4 w-4 text-slate-400" /> {almacen || '—'}
+              <Card>
+                <SectionTitle icon={<Gavel className="h-4 w-4" />}>Resolución y destino</SectionTitle>
+                {resolucion || almacen ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+                      <Gavel className="h-4 w-4" /> {resolucion || '—'}
+                    </div>
+                    <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                      <Warehouse className="h-4 w-4 text-slate-400" /> {almacen || '—'}
+                    </div>
                   </div>
                 ) : (
-                  <>
-                    <select
-                      value={almacen}
-                      onChange={(e) => setAlmacen(e.target.value)}
-                      className="w-full rounded-lg border border-slate-200 bg-white py-2 px-3 text-sm text-slate-700 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                    >
-                      <option value="">Selecciona el almacén…</option>
-                      {ALMACENES.map((a) => (
-                        <option key={a} value={a}>{a}</option>
-                      ))}
-                    </select>
-                    <p className="mt-2 text-[11px] text-slate-500">Obligatorio para autorizar el expediente.</p>
-                  </>
+                  <p className="text-sm text-slate-500">
+                    Se define al <span className="font-medium text-slate-700">autorizar</span>: primero la resolución y luego el almacén destino.
+                  </p>
                 )}
               </Card>
             )}
@@ -760,30 +737,109 @@ export default function ReturnDetail() {
         </div>
       )}
 
-      {/* Selector de resolución (cliente) */}
-      {showResPicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-6" onClick={() => setShowResPicker(false)}>
+      {/* Asistente de autorización: Paso 1 Resolución → Paso 2 Almacén destino */}
+      {authStep && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-6" onClick={() => setAuthStep(null)}>
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-pop" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2">
-              <Gavel className="h-5 w-5 text-brand-600" />
-              <h3 className="text-base font-semibold text-slate-900">Selecciona la resolución</h3>
+              <Check className="h-5 w-5 text-emerald-600" />
+              <h3 className="text-base font-semibold text-slate-900">Autorizar devolución</h3>
             </div>
-            <p className="mt-1 text-sm text-slate-500">Obligatoria para autorizar y cerrar una devolución de cliente.</p>
-            <div className="mt-4 space-y-2">
-              {(Object.keys(RESOLUTIONS) as ResolutionKey[]).map((k) => (
+            {/* Indicador de pasos */}
+            <div className="mt-3 flex items-center gap-2 text-xs font-medium">
+              <span className={cn('rounded-full px-2 py-0.5', authStep === 'res' ? 'bg-brand-600 text-white' : 'bg-emerald-100 text-emerald-700')}>1 · Resolución</span>
+              <span className="text-slate-300">→</span>
+              <span className={cn('rounded-full px-2 py-0.5', authStep === 'alm' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-500')}>2 · Almacén destino</span>
+            </div>
+
+            {authStep === 'res' ? (
+              <>
+                <p className="mt-3 text-sm text-slate-500">Elige la resolución. El almacén destino se define después.</p>
+                <div className="mt-3 space-y-2">
+                  {resolucionesFor(data.tipo).map((opt) => (
+                    <button
+                      key={opt.key}
+                      onClick={() => chooseResolucion(opt)}
+                      className="flex w-full items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-left text-sm text-slate-700 hover:border-brand-300 hover:bg-brand-50/40"
+                    >
+                      {opt.label}
+                      <ArrowRight className="h-4 w-4 text-slate-400" />
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="mt-3 text-sm text-slate-500">
+                  Resolución: <span className="font-medium text-slate-800">{wizRes?.label}</span>. Selecciona el almacén destino.
+                </p>
+                <div className="mt-3 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                  <Warehouse className="h-4 w-4 text-slate-500" />
+                  Línea de mercancía detectada: <span className="font-medium text-slate-800">{linea}</span>. Se recomiendan los almacenes compatibles; la decisión final es tuya.
+                </div>
+
+                {/* Recomendados (compatibles con la línea) */}
+                <p className="mt-4 mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">Recomendados · {linea}</p>
+                <div className="space-y-2">
+                  {almRecomendados.map((a) => (
+                    <button
+                      key={a.nombre}
+                      onClick={() => setWizAlmacen(a.nombre)}
+                      className={cn(
+                        'flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm hover:border-brand-300 hover:bg-brand-50/40',
+                        wizAlmacen === a.nombre ? 'border-brand-300 bg-brand-50 font-medium text-brand-700' : 'border-emerald-200 bg-emerald-50/40 text-slate-700',
+                      )}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Warehouse className="h-4 w-4 text-emerald-600" />
+                        <span>{a.tipo}</span>
+                        <span className="text-slate-400">·</span>
+                        <span className="text-slate-500">{a.nombre}</span>
+                      </span>
+                      {wizAlmacen === a.nombre && <Check className="h-4 w-4 text-brand-600" />}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Otros almacenes (colapsable) */}
                 <button
-                  key={k}
-                  onClick={() => pickResolution(k)}
-                  className={cn(
-                    'flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm hover:border-brand-300 hover:bg-brand-50/40',
-                    resolucion === k ? 'border-brand-300 bg-brand-50 font-medium text-brand-700' : 'border-slate-200 text-slate-700',
-                  )}
+                  onClick={() => setShowOtros((v) => !v)}
+                  className="mt-4 flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700"
                 >
-                  {RESOLUTIONS[k]}
-                  {resolucion === k && <Check className="h-4 w-4 text-brand-600" />}
+                  Otros almacenes ({almOtros.length})
+                  <ChevronDown className={cn('h-4 w-4 transition-transform', showOtros && 'rotate-180')} />
                 </button>
-              ))}
-            </div>
+                {showOtros && (
+                  <div className="mt-2 space-y-2">
+                    {almOtros.map((a) => (
+                      <button
+                        key={a.nombre}
+                        onClick={() => setWizAlmacen(a.nombre)}
+                        className={cn(
+                          'flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm hover:border-brand-300 hover:bg-brand-50/40',
+                          wizAlmacen === a.nombre ? 'border-brand-300 bg-brand-50 font-medium text-brand-700' : 'border-slate-200 text-slate-700',
+                        )}
+                      >
+                        <span className="flex items-center gap-2">
+                          <Warehouse className="h-4 w-4 text-slate-400" />
+                          <span>{a.tipo}</span>
+                          <span className="text-slate-400">·</span>
+                          <span className="text-slate-500">{a.nombre}</span>
+                        </span>
+                        {wizAlmacen === a.nombre && <Check className="h-4 w-4 text-brand-600" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="mt-5 flex justify-between gap-2">
+                  <Button variant="ghost" onClick={() => setAuthStep('res')}>Atrás</Button>
+                  <Button variant="success" icon={<Check className="h-4 w-4" />} disabled={!wizAlmacen} onClick={confirmAuth}>
+                    Confirmar autorización
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
