@@ -267,6 +267,44 @@ export function agrupacionForMarca(marca: string): string | undefined {
   return CATALOGO_CLM.find((r) => r.marca === marca)?.agrupacion
 }
 
+// ------------------- Agrupación comercial (depuración) ---------------------
+// En Depuración de Almacén el sistema clasifica automáticamente cada artículo
+// escaneado en una agrupación comercial derivada de línea/sublínea/género del
+// catálogo maestro (a partir del SKU). Un expediente puede mezclar agrupaciones
+// y el sistema las organiza visualmente.
+
+export type AgrupacionComercial =
+  | 'Calzado Dama'
+  | 'Calzado Caballero'
+  | 'Calzado Niño'
+  | 'Accesorios'
+  | 'Textil'
+  | 'Otros'
+
+export const AGRUPACIONES_COMERCIALES: AgrupacionComercial[] = [
+  'Calzado Dama',
+  'Calzado Caballero',
+  'Calzado Niño',
+  'Accesorios',
+  'Textil',
+  'Otros',
+]
+
+/**
+ * Clasificación comercial por defecto de una marca (para artículos recién
+ * escaneados). El género real proviene del SKU/catálogo; aquí se usa una
+ * aproximación por marca cuando no hay dato de género en el prototipo.
+ */
+export function agrupacionComercialForMarca(marca: string): AgrupacionComercial {
+  const dama = ['Andrea', 'Flexi', 'Clarks']
+  const caballero = ['Nike', 'Adidas', 'Skechers', 'Vans']
+  const accesorios = ['Coach', 'Puma']
+  if (dama.includes(marca)) return 'Calzado Dama'
+  if (caballero.includes(marca)) return 'Calzado Caballero'
+  if (accesorios.includes(marca)) return 'Accesorios'
+  return 'Otros'
+}
+
 // ------------------------- Almacenes destino -------------------------------
 // Compras elige obligatoriamente un almacén destino al autorizar (configurable).
 
@@ -434,6 +472,41 @@ export function loteDetalle(lote: string): LoteDetalle | undefined {
     compradorId: clm?.compradorId ?? 'u3',
     existencias: existenciasFor(lote),
   }
+}
+
+// ------------------- Búsqueda de lote en ERP (devolución masiva) ------------
+// Compras captura solo el número de lote; el ERP devuelve automáticamente la
+// ficha del producto (marca, modelo, color, línea, sublínea, agrupación) y las
+// existencias por sucursal.
+
+export interface LoteInfo {
+  lote: string
+  marca: string
+  modelo: string
+  color: string
+  linea: string
+  subLinea: string
+  agrupacionComercial: AgrupacionComercial
+  existencias: Existencias
+}
+
+const LOTES_ERP: Record<string, Omit<LoteInfo, 'lote' | 'existencias'>> = {
+  'LT-NK-2291': { marca: 'Nike', modelo: 'Air Jordan 1 Mid', color: 'Negro / Rojo', linea: 'Deportivo', subLinea: 'Basketball', agrupacionComercial: 'Calzado Caballero' },
+  'LT-AD-1180': { marca: 'Adidas', modelo: 'Ultraboost Light', color: 'Blanco', linea: 'Deportivo', subLinea: 'Running', agrupacionComercial: 'Calzado Caballero' },
+  'LT-FX-7781': { marca: 'Flexi', modelo: 'Confort dama', color: 'Café', linea: 'Confort', subLinea: 'Confort dama', agrupacionComercial: 'Calzado Dama' },
+  'LT-CH-1200': { marca: 'Coach', modelo: 'Willow', color: 'Café', linea: 'Accesorios', subLinea: 'Bolsos', agrupacionComercial: 'Accesorios' },
+}
+
+const LOTE_ERP_DEFAULT: Omit<LoteInfo, 'lote' | 'existencias'> = {
+  marca: 'Nike', modelo: 'Air Jordan 1 Mid', color: 'Negro / Rojo', linea: 'Deportivo', subLinea: 'Basketball', agrupacionComercial: 'Calzado Caballero',
+}
+
+/** Busca un lote en el ERP y devuelve la ficha + existencias. */
+export function buscarLote(lote: string): LoteInfo | undefined {
+  const q = lote.trim()
+  if (!q) return undefined
+  const info = LOTES_ERP[q] ?? LOTE_ERP_DEFAULT
+  return { lote: q, ...info, existencias: existenciasFor(q) }
 }
 
 export interface TimelineEvent {

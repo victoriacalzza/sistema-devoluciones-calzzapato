@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ScanLine,
+  Search,
   Upload,
   Check,
   Plus,
@@ -24,11 +25,13 @@ import {
   SUCURSALES,
   MOTIVOS,
   MARCAS,
-  AGRUPACIONES,
-  agrupacionForMarca,
-  existenciasFor,
+  AGRUPACIONES_COMERCIALES,
+  agrupacionComercialForMarca,
+  buscarLote,
   supervisorByCode,
   type ReturnTypeKey,
+  type AgrupacionComercial,
+  type LoteInfo,
 } from '../data/mock'
 import { useRole } from '../lib/RoleContext'
 
@@ -41,6 +44,9 @@ const TYPE_ICON: Record<ReturnTypeKey, typeof Store> = {
 }
 
 const ORDER: ReturnTypeKey[] = ['cliente', 'ecommerce', 'depuracion', 'redistribucion', 'masiva']
+
+// Marcas disponibles al escanear en depuración (incluye marcas fuera del catálogo CLM).
+const DEP_MARCAS = Array.from(new Set([...MARCAS, 'Clarks']))
 
 function Field({ label, children, required }: { label: string; children: React.ReactNode; required?: boolean }) {
   return (
@@ -57,11 +63,23 @@ function Field({ label, children, required }: { label: string; children: React.R
 const inputCls =
   'w-full rounded-lg border border-slate-200 bg-white py-2.5 px-3 text-sm placeholder:text-slate-500 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100'
 
+/** Campo de solo lectura (datos traídos automáticamente del ERP). */
+function FieldRO({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className="mt-0.5 font-medium text-slate-800">{value}</div>
+    </div>
+  )
+}
+
 interface DepProd {
   sku: string
   marca: string
   motivo: string
   evidencia: boolean
+  /** Agrupación comercial detectada automáticamente del SKU/catálogo maestro. */
+  agrupacion: AgrupacionComercial
 }
 
 export default function NewReturn() {
@@ -78,14 +96,21 @@ export default function NewReturn() {
   const [step, setStep] = useState(0)
   const [depMode, setDepMode] = useState<'individual' | 'masiva'>('individual')
   const [prods, setProds] = useState<DepProd[]>([
-    { sku: 'FX-IN-3301', marca: 'Flexi', motivo: 'Defecto de fábrica', evidencia: true },
-    { sku: 'FX-IN-3302', marca: 'Flexi', motivo: 'Costura abierta', evidencia: false },
+    { sku: 'FX-DM-3301', marca: 'Flexi', motivo: 'Defecto de fábrica', evidencia: true, agrupacion: 'Calzado Dama' },
+    { sku: 'AN-DM-5510', marca: 'Andrea', motivo: 'Costura abierta', evidencia: true, agrupacion: 'Calzado Dama' },
+    { sku: 'CL-DM-7720', marca: 'Clarks', motivo: 'Suela despegada', evidencia: true, agrupacion: 'Calzado Dama' },
+    { sku: 'NK-CB-2291', marca: 'Nike', motivo: 'Defecto de fábrica', evidencia: true, agrupacion: 'Calzado Caballero' },
+    { sku: 'SK-CB-4410', marca: 'Skechers', motivo: 'Manchas / decoloración', evidencia: true, agrupacion: 'Calzado Caballero' },
+    { sku: 'FX-CB-3390', marca: 'Flexi', motivo: 'Defecto de fábrica', evidencia: true, agrupacion: 'Calzado Caballero' },
+    { sku: 'CH-AC-1200', marca: 'Coach', motivo: 'Producto incompleto', evidencia: false, agrupacion: 'Accesorios' },
   ])
-  // Devolución masiva (Compras): lote, agrupación, marca y sucursales a retirar.
-  const [mLote, setMLote] = useState('LT-NK-2291')
-  const [mAgrupacion, setMAgrupacion] = useState('Deportivo')
-  const [mMarca, setMMarca] = useState('Nike')
-  const [selSuc, setSelSuc] = useState<string[]>(() => existenciasFor('LT-NK-2291').porSucursal.map((e) => e.sucursal))
+  // Grupos comerciales expandidos en el resumen dinámico.
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ 'Calzado Dama': true })
+  // Devolución masiva (Compras): captura solo el lote; el ERP trae la ficha.
+  const [mLote, setMLote] = useState('')
+  const [mLoteInfo, setMLoteInfo] = useState<LoteInfo | null>(null)
+  const [mBuscado, setMBuscado] = useState(false)
+  const [selSuc, setSelSuc] = useState<string[]>([])
   // Autorización de supervisor (solo Tienda) previa a generar el folio.
   const [authOpen, setAuthOpen] = useState(false)
   const [authCode, setAuthCode] = useState('')
@@ -146,32 +171,46 @@ export default function NewReturn() {
 
   const allComplete = prods.every((p) => p.sku && p.motivo && p.evidencia)
 
-  // --- Validaciones de agrupación de línea (no mezclar líneas en un masivo) ---
-  const mExistencias = existenciasFor(mLote)
-  const mSelCount = mExistencias.porSucursal.filter((e) => selSuc.includes(e.sucursal)).length
-  // Masiva: la marca debe pertenecer a la agrupación seleccionada.
-  const masivaMismatch = agrupacionForMarca(mMarca) !== mAgrupacion
-  // Depuración masiva: todos los productos deben compartir la misma agrupación.
-  const depAgrupaciones = Array.from(new Set(prods.map((p) => agrupacionForMarca(p.marca))))
-  const depMasivaMismatch = depAgrupaciones.length > 1
-  const AGRUP_ERROR = 'Se detectaron productos pertenecientes a una línea diferente a la seleccionada. Corrija la selección para continuar.'
+  // --- Devolución masiva: existencias por sucursal y piezas a retirar ---
+  const mSucursales = mLoteInfo?.existencias.porSucursal ?? []
+  const mSelSucs = mSucursales.filter((e) => selSuc.includes(e.sucursal))
+  const mSelCount = mSelSucs.length
+  const mPiezas = mSelSucs.reduce((a, e) => a + e.cantidad, 0)
+
+  function buscarLoteERP() {
+    const info = buscarLote(mLote)
+    setMLoteInfo(info ?? null)
+    setSelSuc(info ? info.existencias.porSucursal.map((e) => e.sucursal) : [])
+    setMBuscado(true)
+  }
+
+  // Depuración: el sistema agrupa automáticamente por agrupación comercial.
+  // Un expediente puede mezclar agrupaciones; se organizan visualmente.
+  const gruposComerciales = AGRUPACIONES_COMERCIALES.map((g) => {
+    const items = prods.filter((p) => p.agrupacion === g)
+    const porMarca = new Map<string, number>()
+    items.forEach((p) => porMarca.set(p.marca, (porMarca.get(p.marca) ?? 0) + 1))
+    return { grupo: g, count: items.length, marcas: Array.from(porMarca, ([marca, n]) => ({ marca, n })).sort((a, b) => b.n - a.n) }
+  }).filter((x) => x.count > 0)
+  const totalMarcas = new Set(prods.map((p) => p.marca)).size
+  const totalMotivos = new Set(prods.map((p) => p.motivo)).size
 
   // ¿Se puede generar el folio en el paso final?
   const canGenerate =
     type === 'masiva'
-      ? !masivaMismatch && mSelCount > 0
+      ? !!mLoteInfo && mSelCount > 0
       : isDepMasiva
-      ? allComplete && !depMasivaMismatch
+      ? allComplete
       : true
 
   function toggleSuc(sucursal: string) {
     setSelSuc((cur) => (cur.includes(sucursal) ? cur.filter((s) => s !== sucursal) : [...cur, sucursal]))
   }
 
-  // No permitir avanzar del paso que valida agrupación/selección.
+  // No permitir avanzar del paso que valida selección/completitud.
   const blockNext =
-    (type === 'masiva' && step === 0 && (masivaMismatch || mSelCount === 0)) ||
-    (isDepMasiva && step === 1 && (!allComplete || depMasivaMismatch))
+    (type === 'masiva' && step === 0 && (!mLoteInfo || mSelCount === 0)) ||
+    (isDepMasiva && step === 1 && !allComplete)
 
   // Destino tras generar el folio (prototipo con datos de ejemplo).
   const destino =
@@ -226,84 +265,113 @@ export default function NewReturn() {
       </div>
 
       <Card className="space-y-5">
-        {/* MASIVA — alta por lote / agrupación / marca + existencias + selección */}
+        {/* MASIVA — paso 0: buscar lote → ficha ERP + existencias + selección */}
         {type === 'masiva' && step === 0 && (
           <>
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-              <Field label="Número de lote" required>
+            {/* Buscar lote */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <label className="block flex-1">
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">Número de lote<span className="ml-0.5 text-brand-600">*</span></span>
                 <div className="relative">
-                  <input className={inputCls} placeholder="LT-NK-2291" value={mLote} onChange={(e) => setMLote(e.target.value)} />
+                  <input className={inputCls} placeholder="LT-NK-2291" value={mLote} onChange={(e) => setMLote(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') buscarLoteERP() }} />
                   <ScanLine className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
                 </div>
-              </Field>
-              <Field label="Agrupación de línea" required>
-                <select className={inputCls} value={mAgrupacion} onChange={(e) => setMAgrupacion(e.target.value)}>
-                  {AGRUPACIONES.map((a) => <option key={a}>{a}</option>)}
-                </select>
-              </Field>
-              <Field label="Marca" required>
-                <select className={inputCls} value={mMarca} onChange={(e) => setMMarca(e.target.value)}>
-                  {MARCAS.map((m) => <option key={m}>{m}</option>)}
-                </select>
-              </Field>
+              </label>
+              <Button variant="secondary" icon={<Search className="h-4 w-4" />} disabled={!mLote.trim()} onClick={buscarLoteERP}>Buscar lote</Button>
             </div>
-
-            {/* Validación de agrupación */}
-            {masivaMismatch && (
-              <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-                {AGRUP_ERROR}
-              </div>
+            {mBuscado && !mLoteInfo && (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">No se encontró el lote en el ERP.</div>
             )}
 
-            {/* Existencias globales del lote */}
-            <div>
-              <div className="mb-2 text-sm font-medium text-slate-700">Existencias del lote</div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <div className="rounded-lg border border-slate-100 px-3 py-2"><div className="text-[11px] text-slate-500">Total</div><div className="text-lg font-semibold text-slate-900">{mExistencias.total}</div></div>
-                <div className="rounded-lg border border-slate-100 px-3 py-2"><div className="text-[11px] text-slate-500">Disponible</div><div className="text-lg font-semibold text-emerald-600">{mExistencias.disponible}</div></div>
-                <div className="rounded-lg border border-slate-100 px-3 py-2"><div className="text-[11px] text-slate-500">En tránsito</div><div className="text-lg font-semibold text-indigo-600">{mExistencias.transito}</div></div>
-                <div className="rounded-lg border border-slate-100 px-3 py-2"><div className="text-[11px] text-slate-500">Comprometida</div><div className="text-lg font-semibold text-amber-600">{mExistencias.comprometida}</div></div>
-              </div>
-            </div>
+            {mLoteInfo && (
+              <>
+                {/* Información del producto (automática desde ERP) */}
+                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                  <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <Check className="h-3.5 w-3.5 text-emerald-600" /> Información del producto (ERP)
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
+                    <FieldRO label="Marca" value={mLoteInfo.marca} />
+                    <FieldRO label="Modelo" value={mLoteInfo.modelo} />
+                    <FieldRO label="Color" value={mLoteInfo.color} />
+                    <FieldRO label="Línea" value={mLoteInfo.linea} />
+                    <FieldRO label="Sub línea" value={mLoteInfo.subLinea} />
+                    <FieldRO label="Agrupación comercial" value={mLoteInfo.agrupacionComercial} />
+                  </div>
+                </div>
 
-            {/* Selección de sucursales para retiro */}
-            <div>
-              <div className="mb-2 text-sm font-medium text-slate-700">Sucursales para el retiro</div>
-              <div className="overflow-hidden rounded-xl border border-slate-100">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-medium text-slate-500">
-                      <th className="px-3 py-2">Sucursal</th>
-                      <th className="px-3 py-2 text-right">Existencia</th>
-                      <th className="px-3 py-2 text-center">Retirar</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mExistencias.porSucursal.map((e) => (
-                      <tr key={e.sucursal} className="border-b border-slate-50 last:border-0">
-                        <td className="px-3 py-2 text-slate-700">{e.sucursal}</td>
-                        <td className="px-3 py-2 text-right font-medium text-slate-900">{e.cantidad}</td>
-                        <td className="px-3 py-2 text-center">
-                          <input type="checkbox" checked={selSuc.includes(e.sucursal)} onChange={() => toggleSuc(e.sucursal)} className="h-4 w-4 accent-brand-600" />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="mt-2 text-xs text-slate-500">Se generará un expediente solo para las sucursales seleccionadas ({mSelCount}).</p>
-            </div>
+                {/* Resumen de existencias */}
+                <div>
+                  <div className="mb-2 text-sm font-medium text-slate-700">Resumen de existencias</div>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <div className="rounded-lg border border-slate-100 px-3 py-2"><div className="text-[11px] text-slate-500">Total</div><div className="text-lg font-semibold text-slate-900">{mLoteInfo.existencias.total}</div></div>
+                    <div className="rounded-lg border border-slate-100 px-3 py-2"><div className="text-[11px] text-slate-500">Disponible</div><div className="text-lg font-semibold text-emerald-600">{mLoteInfo.existencias.disponible}</div></div>
+                    <div className="rounded-lg border border-slate-100 px-3 py-2"><div className="text-[11px] text-slate-500">En tránsito</div><div className="text-lg font-semibold text-indigo-600">{mLoteInfo.existencias.transito}</div></div>
+                    <div className="rounded-lg border border-slate-100 px-3 py-2"><div className="text-[11px] text-slate-500">Comprometida</div><div className="text-lg font-semibold text-amber-600">{mLoteInfo.existencias.comprometida}</div></div>
+                  </div>
+                </div>
+
+                {/* Selección de sucursales para retiro */}
+                <div>
+                  <div className="mb-2 text-sm font-medium text-slate-700">Sucursales con inventario del lote</div>
+                  <div className="overflow-hidden rounded-xl border border-slate-100">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-medium text-slate-500">
+                          <th className="px-3 py-2">Sucursal</th>
+                          <th className="px-3 py-2 text-right">Existencia</th>
+                          <th className="px-3 py-2 text-center">Seleccionar para retiro</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {mSucursales.map((e) => (
+                          <tr key={e.sucursal} className="border-b border-slate-50 last:border-0">
+                            <td className="px-3 py-2 text-slate-700">{e.sucursal}</td>
+                            <td className="px-3 py-2 text-right font-medium text-slate-900">{e.cantidad}</td>
+                            <td className="px-3 py-2 text-center">
+                              <input type="checkbox" checked={selSuc.includes(e.sucursal)} onChange={() => toggleSuc(e.sucursal)} className="h-4 w-4 accent-brand-600" />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Resumen dinámico */}
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-brand-100 bg-brand-50/50 px-4 py-3 text-sm">
+                  <span className="text-slate-600">Sucursales seleccionadas: <span className="font-semibold text-slate-900">{mSelCount}</span></span>
+                  <span className="text-slate-600">Piezas a retirar: <span className="font-semibold text-brand-700">{mPiezas}</span></span>
+                </div>
+              </>
+            )}
           </>
         )}
         {type === 'masiva' && step === 1 && (
-          <div className="text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><Layers className="h-7 w-7" /></div>
-            <h4 className="mt-3 text-base font-semibold text-slate-900">Se generarán {mSelCount} expedientes por sucursal</h4>
-            <p className="mt-1 text-sm text-slate-500">
-              {mExistencias.porSucursal.filter((e) => selSuc.includes(e.sucursal)).map((e) => e.sucursal).join(', ') || 'Ninguna sucursal seleccionada'}
-            </p>
-            <p className="mt-2 text-xs text-slate-400">Lote {mLote} · {mAgrupacion} · {mMarca}</p>
-          </div>
+          <>
+            <div className="text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><Layers className="h-7 w-7" /></div>
+              <h4 className="mt-3 text-base font-semibold text-slate-900">Se generarán {mSelCount} expedientes por sucursal</h4>
+              <p className="mt-1 text-sm text-slate-500">Lote {mLoteInfo?.lote} · {mLoteInfo?.marca} {mLoteInfo?.modelo}</p>
+            </div>
+            <div className="mx-auto mt-4 max-w-md space-y-3">
+              <div className="rounded-xl border border-slate-100 p-3">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Cantidad por sucursal</div>
+                {mSelSucs.map((e) => (
+                  <div key={e.sucursal} className="flex items-baseline gap-2 py-0.5 text-sm">
+                    <span className="text-slate-700">{e.sucursal}</span>
+                    <span className="flex-1 translate-y-[-3px] border-b border-dotted border-slate-300" />
+                    <span className="font-semibold text-slate-900">{e.cantidad}</span>
+                  </div>
+                ))}
+                {mSelSucs.length === 0 && <p className="text-sm text-slate-400">Ninguna sucursal seleccionada.</p>}
+              </div>
+              <div className="flex items-center justify-between rounded-xl border border-brand-100 bg-brand-50/50 px-4 py-3 text-sm">
+                <span className="font-medium text-slate-700">Total de piezas a retirar</span>
+                <span className="text-xl font-semibold text-brand-700">{mPiezas}</span>
+              </div>
+            </div>
+          </>
         )}
 
         {/* DEPURACIÓN — paso 0: modalidad */}
@@ -341,12 +409,47 @@ export default function NewReturn() {
           </>
         )}
 
-        {/* DEPURACIÓN MASIVA — paso 1: lista de productos */}
+        {/* DEPURACIÓN MASIVA — paso 1: captura + resumen dinámico agrupado */}
         {isDepMasiva && step === 1 && (
           <>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-700">Productos del expediente</span>
-              <Button size="sm" variant="secondary" icon={<Plus className="h-4 w-4" />} onClick={() => setProds((p) => [...p, { sku: '', marca: MARCAS[0], motivo: MOTIVOS[0], evidencia: false }])}>
+            {/* Resumen dinámico por agrupación comercial (tiempo real) */}
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-700">Resumen por agrupación comercial</span>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{prods.length} artículos</span>
+              </div>
+              <div className="space-y-2">
+                {gruposComerciales.map(({ grupo, count, marcas }) => (
+                  <div key={grupo} className="overflow-hidden rounded-xl border border-slate-100">
+                    <button
+                      onClick={() => setOpenGroups((o) => ({ ...o, [grupo]: !o[grupo] }))}
+                      className="flex w-full items-center justify-between px-3 py-2 hover:bg-slate-50"
+                    >
+                      <span className="flex items-center gap-2 text-sm font-medium text-slate-800">
+                        <ChevronRight className={cn('h-4 w-4 text-slate-400 transition-transform', openGroups[grupo] && 'rotate-90')} />
+                        {grupo}
+                      </span>
+                      <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">{count}</span>
+                    </button>
+                    {openGroups[grupo] && (
+                      <ul className="divide-y divide-slate-50 border-t border-slate-100 bg-slate-50/50 px-3 py-1">
+                        {marcas.map(({ marca, n }) => (
+                          <li key={marca} className="flex items-center justify-between py-1 text-xs text-slate-600">
+                            <span>{marca}</span>
+                            <span className="font-medium text-slate-500">({n})</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Captura de productos escaneados */}
+            <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+              <span className="text-sm font-medium text-slate-700">Productos escaneados</span>
+              <Button size="sm" variant="secondary" icon={<Plus className="h-4 w-4" />} onClick={() => setProds((p) => [...p, { sku: '', marca: MARCAS[0], motivo: MOTIVOS[0], evidencia: false, agrupacion: agrupacionComercialForMarca(MARCAS[0]) }])}>
                 Agregar producto
               </Button>
             </div>
@@ -366,9 +469,9 @@ export default function NewReturn() {
                     <select
                       className={inputCls}
                       value={p.marca}
-                      onChange={(e) => setProds((arr) => arr.map((x, j) => (j === i ? { ...x, marca: e.target.value } : x)))}
+                      onChange={(e) => setProds((arr) => arr.map((x, j) => (j === i ? { ...x, marca: e.target.value, agrupacion: agrupacionComercialForMarca(e.target.value) } : x)))}
                     >
-                      {MARCAS.map((m) => <option key={m}>{m}</option>)}
+                      {DEP_MARCAS.map((m) => <option key={m}>{m}</option>)}
                     </select>
                     <select
                       className={inputCls}
@@ -378,7 +481,10 @@ export default function NewReturn() {
                       {MOTIVOS.map((m) => <option key={m}>{m}</option>)}
                     </select>
                   </div>
-                  <div className="mt-1.5 text-[11px] text-slate-500">Agrupación: {agrupacionForMarca(p.marca) ?? '—'}</div>
+                  <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-slate-500">
+                    Agrupación detectada:
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600">{p.agrupacion}</span>
+                  </div>
                   <div className="mt-2 flex items-center justify-between">
                     <button
                       onClick={() => setProds((arr) => arr.map((x, j) => (j === i ? { ...x, evidencia: !x.evidencia } : x)))}
@@ -404,24 +510,43 @@ export default function NewReturn() {
                 </div>
               ))}
             </div>
-            {depMasivaMismatch && (
-              <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-                {AGRUP_ERROR}
-              </div>
-            )}
-            <div className={cn('rounded-lg border p-3 text-sm', allComplete && !depMasivaMismatch ? 'border-emerald-100 bg-emerald-50/50 text-emerald-700' : 'border-amber-100 bg-amber-50/50 text-amber-700')}>
-              {allComplete && !depMasivaMismatch
-                ? `Todos los productos comparten la agrupación “${depAgrupaciones[0]}” y tienen SKU, motivo y evidencia. Listo para generar el folio principal.`
-                : 'Cada producto debe tener SKU, marca, motivo y evidencia; y todos deben pertenecer a la misma agrupación de línea.'}
+            <div className={cn('rounded-lg border p-3 text-sm', allComplete ? 'border-emerald-100 bg-emerald-50/50 text-emerald-700' : 'border-amber-100 bg-amber-50/50 text-amber-700')}>
+              {allComplete
+                ? 'Todos los productos tienen SKU, motivo y evidencia. El sistema los agrupó automáticamente por agrupación comercial. Listo para generar el folio principal.'
+                : 'Cada producto debe tener SKU, marca, motivo y evidencia. El sistema agrupa automáticamente por agrupación comercial conforme escaneas.'}
             </div>
           </>
         )}
         {isDepMasiva && step === 2 && (
-          <div className="text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><Layers className="h-7 w-7" /></div>
-            <h4 className="mt-3 text-base font-semibold text-slate-900">Folio principal DEP-2026-00154</h4>
-            <p className="mt-1 text-sm text-slate-500">{prods.length} subregistros compartirán este folio.</p>
-          </div>
+          <>
+            <div className="text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><Layers className="h-7 w-7" /></div>
+              <h4 className="mt-3 text-base font-semibold text-slate-900">Folio principal DEP-2026-00154</h4>
+              <p className="mt-1 text-sm text-slate-500">{prods.length} artículos registrados</p>
+            </div>
+            <div className="mx-auto mt-4 max-w-sm space-y-3">
+              <div className="rounded-xl border border-slate-100 p-3">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Por agrupación</div>
+                {gruposComerciales.map(({ grupo, count }) => (
+                  <div key={grupo} className="flex items-baseline gap-2 py-0.5 text-sm">
+                    <span className="text-slate-700">{grupo}</span>
+                    <span className="flex-1 translate-y-[-3px] border-b border-dotted border-slate-300" />
+                    <span className="font-semibold text-slate-900">{count}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1 rounded-xl border border-slate-100 p-3 text-center">
+                  <div className="text-2xl font-semibold text-slate-900">{totalMotivos}</div>
+                  <div className="text-xs text-slate-500">motivos registrados</div>
+                </div>
+                <div className="flex-1 rounded-xl border border-slate-100 p-3 text-center">
+                  <div className="text-2xl font-semibold text-slate-900">{totalMarcas}</div>
+                  <div className="text-xs text-slate-500">marcas involucradas</div>
+                </div>
+              </div>
+            </div>
+          </>
         )}
 
         {/* NON-MASIVA / NON-DEPURACIÓN step 0: origin */}
