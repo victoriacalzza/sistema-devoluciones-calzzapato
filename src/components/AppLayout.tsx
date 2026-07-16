@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
   Inbox,
@@ -9,18 +9,19 @@ import {
   BarChart3,
   BookOpen,
   Settings,
+  TriangleAlert,
+  Ban,
   Bell,
   Search,
   Menu,
   X,
-  ArrowLeft,
   UserPlus,
   MessageSquareWarning,
   Truck,
   PackageCheck,
   ChevronDown,
 } from 'lucide-react'
-import { Avatar, Button, cn } from '../lib/ui'
+import { Avatar, cn } from '../lib/ui'
 import { KelderLogo } from './KelderLogo'
 import { NOTIFICATIONS, DEMO_PERSONAS } from '../data/mock'
 import { useRole } from '../lib/RoleContext'
@@ -32,6 +33,8 @@ const NAV: { to: string; label: string; icon: typeof LayoutDashboard; key: NavKe
   { to: '/nueva', label: 'Nueva devolución', icon: Plus, key: 'nueva', highlight: true },
   { to: '/pendientes', label: 'Mis pendientes', icon: ListChecks, key: 'pendientes' },
   { to: '/masivas', label: 'Devoluciones masivas', icon: Layers, key: 'masivas' },
+  { to: '/incidencias', label: 'Incidencias Ecommerce', icon: TriangleAlert, key: 'incidencias' },
+  { to: '/bloqueados', label: 'Productos bloqueados', icon: Ban, key: 'bloqueados' },
   { to: '/reportes', label: 'Reportes', icon: BarChart3, key: 'reportes' },
   { to: '/catalogos', label: 'Catálogos', icon: BookOpen, key: 'catalogos' },
   { to: '/configuracion', label: 'Configuración', icon: Settings, key: 'configuracion' },
@@ -206,9 +209,7 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
 function PortalLayout({ children }: { children: React.ReactNode }) {
   const [notifOpen, setNotifOpen] = useState(false)
   const navigate = useNavigate()
-  const location = useLocation()
   const unread = NOTIFICATIONS.filter((n) => n.unread).length
-  const onHome = location.pathname === '/'
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-slate-50">
@@ -217,12 +218,6 @@ function PortalLayout({ children }: { children: React.ReactNode }) {
           <KelderLogo className="h-8 w-auto" />
           <span className="hidden text-[11px] font-medium text-slate-500 sm:inline">Portal de devoluciones</span>
         </button>
-
-        {!onHome && (
-          <Button variant="ghost" size="sm" icon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate('/')}>
-            <span className="hidden sm:inline">Inicio</span>
-          </Button>
-        )}
 
         <div className="flex flex-1 items-center justify-end gap-2">
           <div className="relative">

@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
+import { ChevronLeft } from 'lucide-react'
 import {
   STATUSES,
   PRIORITIES,
@@ -9,6 +11,21 @@ import {
 
 export function cn(...parts: (string | false | null | undefined)[]) {
   return parts.filter(Boolean).join(' ')
+}
+
+/**
+ * Única acción de regreso contextual de la pantalla. Se coloca arriba del título.
+ * `label` es el texto completo (ej. "Volver a Mis devoluciones" / "Volver al inicio").
+ */
+export function BackLink({ to, label }: { to: string; label: string }) {
+  return (
+    <Link
+      to={to}
+      className="mb-3 inline-flex items-center gap-1 rounded text-sm font-medium text-slate-500 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+    >
+      <ChevronLeft className="h-4 w-4" /> {label}
+    </Link>
+  )
 }
 
 export function Card({

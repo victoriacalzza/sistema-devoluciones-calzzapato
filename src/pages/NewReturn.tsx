@@ -18,7 +18,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react'
 import { PageHeader } from '../components/AppLayout'
-import { Card, Button, cn } from '../lib/ui'
+import { Card, Button, BackLink, cn } from '../lib/ui'
 import {
   RETURN_TYPES,
   SUCURSALES,
@@ -67,9 +67,10 @@ interface DepProd {
 export default function NewReturn() {
   const navigate = useNavigate()
   const { role } = useRole()
-  // Tipos permitidos por rol: Ecommerce solo Ecommerce; Tienda todo menos masiva; Compras solo Masiva.
+  // Tipos permitidos por rol: Tienda todo menos masiva; Compras solo Masiva.
+  // Ecommerce NO crea devoluciones (opera incidencias, no expedientes).
   const allowed = ORDER.filter((k) => {
-    if (role === 'ecommerce') return k === 'ecommerce'
+    if (role === 'ecommerce') return false
     if (role === 'tienda') return k !== 'masiva'
     return k === 'masiva' // compras
   })
@@ -90,9 +91,15 @@ export default function NewReturn() {
   const [authCode, setAuthCode] = useState('')
   const [authError, setAuthError] = useState('')
 
+  // Destino de salida de la pantalla (una sola acción de regreso, según rol).
+  const back = role === 'compras'
+    ? { to: '/masivas', label: 'Volver a Devoluciones masivas' }
+    : { to: '/', label: 'Volver al inicio' }
+
   if (!type) {
     return (
       <div className="mx-auto max-w-[1200px] px-4 py-6 lg:px-8">
+        <BackLink to={back.to} label={back.label} />
         <PageHeader title="Nueva devolución" subtitle="Selecciona el tipo de devolución para iniciar un nuevo expediente" />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {allowed.map((key, i) => {
@@ -196,10 +203,12 @@ export default function NewReturn() {
 
   return (
     <div className="mx-auto max-w-[860px] px-4 py-6 lg:px-8">
-      {allowed.length > 1 && (
-        <button onClick={() => setType(null)} className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900">
-          <ChevronLeft className="h-4 w-4" /> Cambiar tipo
+      {allowed.length > 1 ? (
+        <button onClick={() => setType(null)} className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-900">
+          <ChevronLeft className="h-4 w-4" /> Volver a tipos de devolución
         </button>
+      ) : (
+        <BackLink to={back.to} label={back.label} />
       )}
       <PageHeader title={t.label} subtitle={t.desc} />
 

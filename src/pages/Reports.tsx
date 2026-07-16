@@ -11,9 +11,10 @@ import {
   Legend,
   CartesianGrid,
 } from 'recharts'
-import { FileSpreadsheet, FileText, Sparkles } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import { PageHeader } from '../components/AppLayout'
-import { Card, SectionTitle, Button, Pill } from '../lib/ui'
+import { Card, SectionTitle, Pill } from '../lib/ui'
+import { ExportMenu } from '../components/ExportMenu'
 import { byProveedor, byMarca, byType, byMotivo, topLotes, CHART_COLORS } from '../data/mock'
 
 const tooltipStyle = {
@@ -30,10 +31,18 @@ export default function Reports() {
         title="Reportes"
         subtitle="Dashboards interactivos y análisis de devoluciones"
         actions={
-          <>
-            <Button size="sm" variant="secondary" icon={<FileSpreadsheet className="h-4 w-4 text-emerald-600" />}>Excel</Button>
-            <Button size="sm" variant="secondary" icon={<FileText className="h-4 w-4 text-brand-600" />}>PDF</Button>
-          </>
+          <ExportMenu
+            filename="reporte-lotes-incidencia"
+            title="Reporte de Compras · Lotes con mayor incidencia"
+            columns={[
+              { header: 'Lote', key: 'lote' },
+              { header: 'Marca', key: 'marca' },
+              { header: 'Proveedor', key: 'proveedor' },
+              { header: 'Incidencias', key: 'incidencias' },
+              { header: 'Tasa de falla', key: 'tasa' },
+            ]}
+            rows={topLotes.map((l) => ({ lote: l.lote, marca: l.marca, proveedor: l.proveedor, incidencias: l.incidencias, tasa: l.tasa }))}
+          />
         }
       />
 

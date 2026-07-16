@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import {
-  ChevronLeft,
   Check,
   X,
   MessageSquarePlus,
@@ -33,8 +32,10 @@ import {
   Play,
   Video,
   ChevronDown,
+  Ban,
+  Store,
 } from 'lucide-react'
-import { Card, SectionTitle, StatusBadge, PriorityBadge, Avatar, Button, cn } from '../lib/ui'
+import { Card, SectionTitle, StatusBadge, PriorityBadge, Avatar, Button, BackLink, cn } from '../lib/ui'
 import {
   findReturn,
   personById,
@@ -265,9 +266,7 @@ export default function ReturnDetail() {
       {/* Sticky header */}
       <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto max-w-[1400px] px-4 py-4 lg:px-8">
-          <button onClick={() => navigate(-1)} className="mb-3 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900">
-            <ChevronLeft className="h-4 w-4" /> Volver
-          </button>
+          <BackLink to="/devoluciones" label={role === 'compras' ? 'Volver a la bandeja de trabajo' : role === 'tienda' ? 'Volver a Mis devoluciones' : 'Volver a Devoluciones'} />
           <div>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="font-mono text-2xl font-semibold tracking-tight text-slate-900">{data.folio}</h1>
@@ -644,6 +643,26 @@ export default function ReturnDetail() {
                     Se define al <span className="font-medium text-slate-700">autorizar</span>: primero la resolución y luego el almacén destino.
                   </p>
                 )}
+              </Card>
+            )}
+
+            {/* Producto rechazado que permanece en tienda */}
+            {data.bloqueadoEcommerce && (
+              <Card>
+                <SectionTitle icon={<Ban className="h-4 w-4 text-rose-500" />}>Disposición del producto</SectionTitle>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
+                    <Ban className="h-4 w-4" /> Bloqueado para Ecommerce
+                  </div>
+                  {data.ventaFisica && (
+                    <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+                      <Store className="h-4 w-4" /> Disponible para venta física
+                    </div>
+                  )}
+                  {data.resolucionRechazo && (
+                    <p className="text-xs text-slate-500">{data.resolucionRechazo}</p>
+                  )}
+                </div>
               </Card>
             )}
 

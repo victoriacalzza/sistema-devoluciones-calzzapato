@@ -528,6 +528,14 @@ export interface ReturnCase {
   almacen?: string
   /** Subregistros de una depuración masiva (cada producto con SKU, motivo y evidencia). */
   subproductos?: SubProducto[]
+  /**
+   * Producto rechazado que permanece en la tienda: se bloquea para Ecommerce
+   * pero sigue disponible para venta física. Lo determina Compras al rechazar.
+   */
+  bloqueadoEcommerce?: boolean
+  ventaFisica?: boolean
+  /** Resolución textual registrada al rechazar y determinar el destino del producto. */
+  resolucionRechazo?: string
 }
 
 export interface SubProducto {
@@ -803,6 +811,9 @@ export const RETURNS: ReturnCase[] = [
     creadorId: 'u1',
     slaDue: 'Resuelto',
     outOfSla: false,
+    bloqueadoEcommerce: true,
+    ventaFisica: true,
+    resolucionRechazo: 'Producto permanece en tienda para venta física · bloqueado para Ecommerce',
     product: {
       sku: 'PM-RS-9910',
       descripcion: 'Puma RS-X — Gris',
@@ -1149,3 +1160,445 @@ export const COMPRAS_KPIS = {
 }
 
 export const CHART_COLORS = ['#D32F2F', '#f59e0b', '#6366f1', '#10b981', '#0ea5e9', '#8b5cf6']
+
+// ===========================================================================
+// INCIDENCIAS DE ECOMMERCE
+// ---------------------------------------------------------------------------
+// El rol Ecommerce NO genera devoluciones. Su operación es recibir e
+// inspeccionar la mercancía que una sucursal envía al almacén Ecommerce vía
+// redistribución y, cuando llega en mal estado, registrar una
+// "Incidencia en redistribución". El objetivo es registro, seguimiento y
+// reporteo — sin automatizar consecuencias ni sanciones.
+// ===========================================================================
+
+export type IncidenciaStatus = 'abierta' | 'revision' | 'esperando' | 'resuelta' | 'cerrada'
+
+export const INCIDENCIA_STATUS: Record<IncidenciaStatus, { label: string; text: string; bg: string; dot: string }> = {
+  abierta: { label: 'Abierta', text: 'text-blue-700', bg: 'bg-blue-50', dot: 'bg-blue-500' },
+  revision: { label: 'En revisión de Compras', text: 'text-violet-700', bg: 'bg-violet-50', dot: 'bg-violet-500' },
+  esperando: { label: 'Esperando información', text: 'text-amber-700', bg: 'bg-amber-50', dot: 'bg-amber-500' },
+  resuelta: { label: 'Resuelta', text: 'text-emerald-700', bg: 'bg-emerald-50', dot: 'bg-emerald-500' },
+  cerrada: { label: 'Cerrada', text: 'text-slate-600', bg: 'bg-slate-100', dot: 'bg-slate-500' },
+}
+
+/** Motivos de incidencia al recibir mercancía en mal estado en el almacén Ecommerce. */
+export const MOTIVOS_INCIDENCIA = [
+  'Empaque dañado',
+  'Producto manchado / sucio',
+  'Producto incompleto',
+  'Modelo o talla incorrecta',
+  'Daño en transporte',
+  'Sello de seguridad violado',
+  'Mercancía mojada',
+  'Faltante de piezas',
+]
+
+export interface Incidencia {
+  folio: string
+  /** ID o folio relacionado (traslado / redistribución de origen). */
+  relacionado: string
+  sku: string
+  producto: string
+  lote: string
+  marca: string
+  proveedor: string
+  categoria: string
+  /** Trazabilidad del envío que originó la incidencia. */
+  sucursalOrigen: string
+  gerenteOrigen: string
+  motivo: string
+  status: IncidenciaStatus
+  priority: PriorityKey
+  /** Comprador responsable de la línea/marca (consulta de responsables). */
+  responsableId: string
+  /** Resolución registrada por Compras (consulta de resoluciones). */
+  resolucion?: string
+  creada: string
+  image: string
+  evidencias: Evidence[]
+  comments: Comment[]
+  timeline: TimelineEvent[]
+}
+
+export const INCIDENCIAS: Incidencia[] = [
+  {
+    folio: 'INC-EC-2026-0007',
+    relacionado: 'TR-45012',
+    sku: 'NK-AJ1-2291',
+    producto: 'Tenis Nike Air Jordan 1 Mid — Negro/Rojo',
+    lote: 'LT-NK-2291',
+    marca: 'Nike',
+    proveedor: 'Nike México',
+    categoria: 'Deportivo',
+    sucursalOrigen: 'Culiacán Centro',
+    gerenteOrigen: 'Laura Beltrán',
+    motivo: 'Empaque dañado',
+    status: 'abierta',
+    priority: 'alta',
+    responsableId: 'u3',
+    creada: '14 jul 2026',
+    image: IMG.sneakerRed,
+    evidencias: [
+      { url: IMG.boxShoes, label: 'Caja aplastada', kind: 'image' },
+      { url: IMG.sneakerRed, label: 'Video de la inspección', kind: 'video' },
+    ],
+    comments: [
+      { id: 'c1', authorId: 'u7', time: '10:20', text: 'Al recibir el traslado TR-45012 detecté 3 cajas aplastadas. Adjunto evidencia fotográfica y video de la inspección.', attachment: { name: 'caja_aplastada.jpg', kind: 'image' } },
+    ],
+    timeline: [
+      ev('14 jul', '10:15', 'Paola Ceballos', 'registró la incidencia', 'create'),
+      ev('14 jul', '10:20', 'Paola Ceballos', 'adjuntó evidencias', 'attach'),
+      ev('14 jul', '10:40', 'Sistema', 'asignó la incidencia a Fernanda López (Compras)', 'status'),
+    ],
+  },
+  {
+    folio: 'INC-EC-2026-0006',
+    relacionado: 'TR-44980',
+    sku: 'AD-UB-1180',
+    producto: 'Tenis Adidas Ultraboost Light — Blanco',
+    lote: 'LT-AD-1180',
+    marca: 'Adidas',
+    proveedor: 'Adidas México',
+    categoria: 'Deportivo',
+    sucursalOrigen: 'Guadalajara Andares',
+    gerenteOrigen: 'Ramón Cázares',
+    motivo: 'Producto manchado / sucio',
+    status: 'esperando',
+    priority: 'media',
+    responsableId: 'u3',
+    creada: '12 jul 2026',
+    image: IMG.sneakerWhite,
+    evidencias: [{ url: IMG.sneakerWhite, label: 'Mancha en tela', kind: 'image' }],
+    comments: [
+      { id: 'c1', authorId: 'u7', time: '09:10', text: 'Par blanco recibido con manchas de suela. No apto para venta en línea.' },
+      { id: 'c2', authorId: 'u3', time: '11:30', text: '@Paola Ceballos ¿puedes confirmar cuántos pares del lote presentan la mancha? Necesito el dato para la resolución.' },
+    ],
+    timeline: [
+      ev('12 jul', '09:05', 'Paola Ceballos', 'registró la incidencia', 'create'),
+      ev('12 jul', '11:30', 'Fernanda López', 'solicitó más información', 'comment'),
+    ],
+  },
+  {
+    folio: 'INC-EC-2026-0005',
+    relacionado: 'TR-44905',
+    sku: 'CH-BG-1200',
+    producto: 'Bolsa Coach Willow — Café',
+    lote: 'LT-CH-1200',
+    marca: 'Coach',
+    proveedor: 'VF Corp',
+    categoria: 'Accesorios',
+    sucursalOrigen: 'Guasave Centro',
+    gerenteOrigen: 'Patricia Nava',
+    motivo: 'Faltante de piezas',
+    status: 'revision',
+    priority: 'urgente',
+    responsableId: 'u5',
+    creada: '11 jul 2026',
+    image: IMG.bag,
+    evidencias: [{ url: IMG.bag, label: 'Contenido incompleto', kind: 'image' }],
+    comments: [
+      { id: 'c1', authorId: 'u7', time: '16:40', text: 'El envío indica 4 piezas pero solo llegaron 3. Falta 1 bolsa Coach Willow.' },
+    ],
+    timeline: [
+      ev('11 jul', '16:35', 'Paola Ceballos', 'registró la incidencia', 'create'),
+      ev('11 jul', '17:00', 'Sistema', 'asignó la incidencia a Diana Quintero (Compras)', 'status'),
+    ],
+  },
+  {
+    folio: 'INC-EC-2026-0004',
+    relacionado: 'TR-44870',
+    sku: 'VN-OS-3320',
+    producto: 'Vans Old Skool — Negro/Blanco',
+    lote: 'LT-VN-3320',
+    marca: 'Vans',
+    proveedor: 'VF Corp',
+    categoria: 'Casual',
+    sucursalOrigen: 'Los Mochis Plaza',
+    gerenteOrigen: 'Patricia Nava',
+    motivo: 'Daño en transporte',
+    status: 'resuelta',
+    priority: 'baja',
+    responsableId: 'u5',
+    resolucion: 'Producto enviado a Almacén de merma · no recuperable',
+    creada: '08 jul 2026',
+    image: IMG.running,
+    evidencias: [{ url: IMG.running, label: 'Daño en caja' }],
+    comments: [
+      { id: 'c1', authorId: 'u5', time: '10:00', text: 'Confirmado daño irreversible. Se envía a merma. Resolución registrada.' },
+    ],
+    timeline: [
+      ev('08 jul', '09:20', 'Paola Ceballos', 'registró la incidencia', 'create'),
+      ev('08 jul', '10:00', 'Diana Quintero', 'resolvió la incidencia', 'status'),
+    ],
+  },
+  {
+    folio: 'INC-EC-2026-0003',
+    relacionado: 'TR-44810',
+    sku: 'AN-ZP-5510',
+    producto: 'Zapatilla Andrea tacón medio — Nude',
+    lote: 'LT-AN-5510',
+    marca: 'Andrea',
+    proveedor: 'Grupo Andrea',
+    categoria: 'Calzado dama',
+    sucursalOrigen: 'Culiacán Forum',
+    gerenteOrigen: 'Elena Ruvalcaba',
+    motivo: 'Modelo o talla incorrecta',
+    status: 'cerrada',
+    priority: 'media',
+    responsableId: 'u4',
+    resolucion: 'Reetiquetado y reingreso a inventario Ecommerce',
+    creada: '05 jul 2026',
+    image: IMG.heels,
+    evidencias: [{ url: IMG.heels, label: 'Etiqueta incorrecta' }],
+    comments: [],
+    timeline: [
+      ev('05 jul', '12:00', 'Paola Ceballos', 'registró la incidencia', 'create'),
+      ev('06 jul', '09:00', 'Óscar Beltrán', 'resolvió y cerró la incidencia', 'status'),
+    ],
+  },
+  // -------- Historial (para tendencia mensual y filtros por periodo) --------
+  ...([
+    ['INC-EC-2026-0002', 'AD-UB-1180', 'Tenis Adidas Ultraboost Light — Blanco', 'LT-AD-1180', 'Adidas', 'Adidas México', 'Deportivo', 'Guadalajara Andares', 'Ramón Cázares', 'Producto manchado / sucio', 'cerrada', 'media', 'u3', '28 jun 2026', 'sneakerWhite'],
+    ['INC-EC-2026-0001', 'NK-AJ1-2291', 'Tenis Nike Air Jordan 1 Mid — Negro/Rojo', 'LT-NK-2291', 'Nike', 'Nike México', 'Deportivo', 'Culiacán Centro', 'Laura Beltrán', 'Empaque dañado', 'resuelta', 'alta', 'u3', '19 jun 2026', 'sneakerRed'],
+    ['INC-EC-2026-0000', 'PM-RS-9910', 'Puma RS-X — Gris', 'LT-PM-9910', 'Puma', 'Puma LATAM', 'Accesorios', 'Hermosillo Sur', 'Mónica Salazar', 'Faltante de piezas', 'cerrada', 'baja', 'u5', '09 jun 2026', 'running'],
+    ['INC-EC-2025-0142', 'CH-BG-1200', 'Bolsa Coach Willow — Café', 'LT-CH-1200', 'Coach', 'VF Corp', 'Accesorios', 'Guasave Centro', 'Sergio Padilla', 'Daño en transporte', 'cerrada', 'media', 'u5', '22 may 2026', 'bag'],
+    ['INC-EC-2025-0141', 'FX-CM-7781', 'Zapato confort Flexi dama — Café', 'LT-FX-7781', 'Flexi', 'Calzado Flexi S.A.', 'Calzado dama', 'Mazatlán Marina', 'Hugo Terán', 'Mercancía mojada', 'resuelta', 'media', 'u4', '07 may 2026', 'heels'],
+    ['INC-EC-2025-0140', 'VN-OS-3320', 'Vans Old Skool — Negro/Blanco', 'LT-VN-3320', 'Vans', 'VF Corp', 'Casual', 'Tijuana Río', 'Carlos Fuentes', 'Modelo o talla incorrecta', 'cerrada', 'baja', 'u5', '24 abr 2026', 'running'],
+    ['INC-EC-2025-0139', 'SK-GW-4410', 'Skechers Go Walk — Azul marino', 'LT-SK-4410', 'Skechers', 'VF Corp', 'Deportivo', 'Guadalajara Patria', 'Adriana Michel', 'Sello de seguridad violado', 'cerrada', 'media', 'u3', '11 abr 2026', 'sneakerWhite'],
+    ['INC-EC-2025-0138', 'AN-ZP-5510', 'Zapatilla Andrea tacón medio — Nude', 'LT-AN-5510', 'Andrea', 'Grupo Andrea', 'Calzado dama', 'Culiacán Forum', 'Elena Ruvalcaba', 'Producto incompleto', 'resuelta', 'baja', 'u4', '20 mar 2026', 'heels'],
+    ['INC-EC-2025-0137', 'NK-AJ1-2291', 'Tenis Nike Air Jordan 1 Mid — Negro/Rojo', 'LT-NK-2291', 'Nike', 'Nike México', 'Deportivo', 'Los Mochis Plaza', 'Patricia Nava', 'Empaque dañado', 'cerrada', 'media', 'u3', '06 mar 2026', 'sneakerRed'],
+    ['INC-EC-2025-0136', 'CH-BG-1200', 'Bolsa Coach Willow — Café', 'LT-CH-1200', 'Coach', 'VF Corp', 'Accesorios', 'Hermosillo Morelos', 'Néstor Padrón', 'Daño en transporte', 'cerrada', 'alta', 'u5', '14 feb 2026', 'bag'],
+  ] as const).map(([folio, sku, producto, lote, marca, proveedor, categoria, sucursalOrigen, gerenteOrigen, motivo, status, priority, responsableId, creada, img]) => ({
+    folio,
+    relacionado: `TR-${folio.slice(-4)}`,
+    sku,
+    producto,
+    lote,
+    marca,
+    proveedor,
+    categoria,
+    sucursalOrigen,
+    gerenteOrigen,
+    motivo,
+    status: status as IncidenciaStatus,
+    priority: priority as PriorityKey,
+    responsableId,
+    resolucion: status === 'cerrada' || status === 'resuelta' ? 'Resolución registrada por Compras' : undefined,
+    creada,
+    image: (IMG as Record<string, string>)[img],
+    evidencias: [{ url: (IMG as Record<string, string>)[img], label: 'Evidencia' }],
+    comments: [],
+    timeline: [ev(creada.slice(0, 6), '10:00', 'Paola Ceballos', 'registró la incidencia', 'create')],
+  })),
+]
+
+export function findIncidencia(folio: string): Incidencia | undefined {
+  return INCIDENCIAS.find((i) => i.folio === folio)
+}
+
+// --------------------------- Productos bloqueados --------------------------
+// Cuando Compras rechaza una devolución y el producto permanece en la tienda,
+// el producto se bloquea para Ecommerce pero sigue disponible para venta física.
+
+export interface ProductoBloqueado {
+  sku: string
+  producto: string
+  sucursal: string
+  folioOrigen: string
+  motivo: string
+  fecha: string
+  image: string
+  ventaFisica: boolean
+}
+
+export const BLOQUEADOS_ECOMMERCE: ProductoBloqueado[] = [
+  { sku: 'PM-RS-9910', producto: 'Puma RS-X — Gris', sucursal: 'Hermosillo Sur', folioOrigen: 'DEV-2026-000149', motivo: 'Devolución rechazada · daño por mal uso', fecha: '01 jul 2026', image: IMG.running, ventaFisica: true },
+  { sku: 'SK-GW-4410', producto: 'Skechers Go Walk — Azul marino', sucursal: 'Culiacán Centro', folioOrigen: 'DEV-2026-000144', motivo: 'Producto sin defecto detectado · permanece en tienda', fecha: '28 jun 2026', image: IMG.sneakerWhite, ventaFisica: true },
+  { sku: 'FX-CM-7781', producto: 'Zapato confort Flexi dama — Café', sucursal: 'Mazatlán Marina', folioOrigen: 'DEV-2026-000139', motivo: 'Fuera de política de devolución', fecha: '24 jun 2026', image: IMG.heels, ventaFisica: true },
+]
+
+// -------------------- KPIs operativos del portal Ecommerce -----------------
+// Derivados de las incidencias y de los productos bloqueados.
+
+export const ECOMMERCE_KPIS = {
+  abiertas: INCIDENCIAS.filter((i) => i.status === 'abierta' || i.status === 'revision' || i.status === 'esperando').length,
+  pendientesRevision: INCIDENCIAS.filter((i) => i.status === 'abierta').length,
+  resueltas: INCIDENCIAS.filter((i) => i.status === 'resuelta' || i.status === 'cerrada').length,
+  bloqueados: BLOQUEADOS_ECOMMERCE.length,
+  tiempoResolucion: '2.1 días',
+}
+
+// Análisis para reporte de incidencias Ecommerce.
+export const incidenciasPorMotivo = MOTIVOS_INCIDENCIA.map((m) => ({
+  name: m,
+  value: INCIDENCIAS.filter((i) => i.motivo === m).length,
+})).filter((d) => d.value > 0)
+
+// ------------------------- Fechas (demo determinista) ----------------------
+// El prototipo usa fechas fijas de julio 2026; "HOY" ancla los cálculos
+// relativos (tiempo transcurrido, SLA) para que sean deterministas.
+
+export const HOY = '15 jul 2026'
+
+const MESES_ES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+
+/** Convierte "DD mmm YYYY" (es) a un número de días absoluto aproximado. */
+function fechaADias(fecha: string): number | null {
+  const m = fecha.trim().match(/^(\d{1,2})\s+([a-záéí]{3})\.?\s+(\d{4})$/i)
+  if (!m) return null
+  const dia = parseInt(m[1], 10)
+  const mes = MESES_ES.indexOf(m[2].toLowerCase().slice(0, 3))
+  const anio = parseInt(m[3], 10)
+  if (mes < 0) return null
+  return anio * 365 + mes * 30 + dia
+}
+
+/** Número comparable de días desde fechas "DD mmm YYYY" (es) o "YYYY-MM-DD" (ISO). */
+export function fechaANumero(str: string): number | null {
+  if (!str) return null
+  const iso = str.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (iso) return parseInt(iso[1], 10) * 365 + (parseInt(iso[2], 10) - 1) * 30 + parseInt(iso[3], 10)
+  return fechaADias(str)
+}
+
+/** Días transcurridos entre una fecha y HOY (para "tiempo transcurrido"). */
+export function diasTranscurridos(fecha: string): number {
+  const a = fechaADias(fecha)
+  const b = fechaADias(HOY)
+  if (a == null || b == null) return 0
+  return Math.max(0, b - a)
+}
+
+/** Texto "hace X días / horas" a partir de la fecha de creación. */
+export function tiempoTranscurrido(fecha: string): string {
+  const d = diasTranscurridos(fecha)
+  if (d <= 0) return 'Hoy'
+  if (d === 1) return '1 día'
+  return `${d} días`
+}
+
+/** ¿La fecha "DD mmm YYYY" cae dentro del rango [desde, hasta] (mismo formato)? */
+export function fechaEnRango(fecha: string, desde: string, hasta: string): boolean {
+  const f = fechaADias(fecha)
+  if (f == null) return true
+  const d = desde ? fechaADias(desde) : null
+  const h = hasta ? fechaADias(hasta) : null
+  if (d != null && f < d) return false
+  if (h != null && f > h) return false
+  return true
+}
+
+// ---------------------------- Gerentes por sucursal ------------------------
+// Responsable de cada sucursal origen (para trazabilidad de incidencias).
+
+export const GERENTES_SUCURSAL: Record<string, string> = {
+  'Culiacán Centro': 'Laura Beltrán',
+  'Culiacán Forum': 'Elena Ruvalcaba',
+  'Mazatlán Marina': 'Hugo Terán',
+  'Los Mochis Plaza': 'Patricia Nava',
+  'Guadalajara Andares': 'Ramón Cázares',
+  'Guasave Centro': 'Sergio Padilla',
+  'Hermosillo Sur': 'Mónica Salazar',
+  'CEDIS Culiacán': 'Raúl Espinoza',
+  'Tijuana Río': 'Carlos Fuentes',
+  'Guadalajara Patria': 'Adriana Michel',
+  'Hermosillo Morelos': 'Néstor Padrón',
+}
+
+export function gerenteDeSucursal(sucursal: string): string {
+  return GERENTES_SUCURSAL[sucursal] ?? '—'
+}
+
+/** Sucursales que pueden ser origen de una redistribución (captura manual). */
+export const SUCURSALES_ORIGEN = Array.from(new Set([...SUCURSALES, 'Tijuana Río', 'Guadalajara Patria', 'Hermosillo Morelos']))
+
+/** Gerentes para autocompletado al capturar la trazabilidad de la incidencia. */
+export const GERENTES = Array.from(new Set(Object.values(GERENTES_SUCURSAL)))
+
+/** Severidad de una incidencia de redistribución (para priorizar y reportar). */
+export const SEVERIDADES = ['Baja', 'Media', 'Alta', 'Crítica']
+
+// ------------------- Traslados de redistribución (wizard) ------------------
+// El wizard de incidencias busca un traslado por ID de venta / traslado /
+// folio de redistribución y trae sus productos para seleccionar el afectado.
+
+export interface TrasladoProducto {
+  sku: string
+  descripcion: string
+  marca: string
+  proveedor: string
+  lote: string
+  talla: string
+  color: string
+  image: string
+}
+
+export interface Traslado {
+  folioRedistribucion: string
+  idTraslado: string
+  idVenta: string
+  sucursalOrigen: string
+  fecha: string
+  productos: TrasladoProducto[]
+}
+
+export const TRASLADOS: Traslado[] = [
+  {
+    folioRedistribucion: 'RD-2026-0091',
+    idTraslado: 'TR-45012',
+    idVenta: 'EC-99210',
+    sucursalOrigen: 'Culiacán Centro',
+    fecha: '12 jul 2026',
+    productos: [
+      { sku: 'NK-AJ1-2291', descripcion: 'Tenis Nike Air Jordan 1 Mid — Negro/Rojo', marca: 'Nike', proveedor: 'Nike México', lote: 'LT-NK-2291', talla: '27 MX', color: 'Negro / Rojo', image: IMG.sneakerRed },
+      { sku: 'AD-UB-1180', descripcion: 'Tenis Adidas Ultraboost Light — Blanco', marca: 'Adidas', proveedor: 'Adidas México', lote: 'LT-AD-1180', talla: '28 MX', color: 'Blanco', image: IMG.sneakerWhite },
+      { sku: 'CH-BG-1200', descripcion: 'Bolsa Coach Willow — Café', marca: 'Coach', proveedor: 'VF Corp', lote: 'LT-CH-1200', talla: 'Única', color: 'Café', image: IMG.bag },
+    ],
+  },
+  {
+    folioRedistribucion: 'RD-2026-0088',
+    idTraslado: 'TR-44980',
+    idVenta: 'EC-99120',
+    sucursalOrigen: 'Guadalajara Andares',
+    fecha: '10 jul 2026',
+    productos: [
+      { sku: 'SK-GW-4410', descripcion: 'Skechers Go Walk — Azul marino', marca: 'Skechers', proveedor: 'VF Corp', lote: 'LT-SK-4410', talla: '27 MX', color: 'Azul marino', image: IMG.sneakerWhite },
+      { sku: 'VN-OS-3320', descripcion: 'Vans Old Skool — Negro/Blanco', marca: 'Vans', proveedor: 'VF Corp', lote: 'LT-VN-3320', talla: '26 MX', color: 'Negro / Blanco', image: IMG.running },
+    ],
+  },
+]
+
+/** Busca un traslado por ID de venta, ID de traslado, folio de redistribución o SKU. */
+export function buscarTraslado(q: { idVenta?: string; idTraslado?: string; folioRedistribucion?: string; sku?: string }): Traslado | undefined {
+  const norm = (s?: string) => (s ?? '').trim().toLowerCase()
+  const anyInput = norm(q.idVenta) || norm(q.idTraslado) || norm(q.folioRedistribucion) || norm(q.sku)
+  const found = TRASLADOS.find(
+    (t) =>
+      (norm(q.idVenta) && norm(t.idVenta) === norm(q.idVenta)) ||
+      (norm(q.idTraslado) && norm(t.idTraslado) === norm(q.idTraslado)) ||
+      (norm(q.folioRedistribucion) && norm(t.folioRedistribucion) === norm(q.folioRedistribucion)) ||
+      (norm(q.sku) && t.productos.some((p) => norm(p.sku) === norm(q.sku))),
+  )
+  // En el prototipo, si no hay coincidencia exacta pero se capturó algún dato,
+  // se devuelve el primer traslado de ejemplo para poder continuar el flujo.
+  if (found) return found
+  if (anyInput) return TRASLADOS[0]
+  return undefined
+}
+
+/** Motivos sugeridos en el wizard de incidencia (paso Registrar incidencia detectada). */
+export const MOTIVOS_INCIDENCIA_WIZARD = [
+  'Producto dañado',
+  'Mal embalaje',
+  'Producto usado',
+  'Producto incompleto',
+  'Error de surtido',
+  'Producto diferente al solicitado',
+  'Otro',
+]
+
+// Devoluciones pendientes de resolución por Compras que impactan inventario
+// Ecommerce (productos devueltos en tienda física aún sin resolución).
+const PENDIENTE_RESOLUCION: StatusKey[] = ['nuevo', 'revision', 'esperando']
+export const devolucionesPendientesResolucion = () =>
+  RETURNS.filter((r) => PENDIENTE_RESOLUCION.includes(r.status))

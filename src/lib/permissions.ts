@@ -1,11 +1,13 @@
 // ---------------------------------------------------------------------------
 // Capa de roles y permisos — TRES roles + subrol Administrador (dentro de Compras).
 // · Tienda: registra y da seguimiento a devoluciones (sucursal, portal simple).
-// · Ecommerce: registra y da seguimiento a devoluciones del canal en línea.
-// · Compras: revisa, autoriza, rechaza, gestiona y cierra (corporativo).
+// · Ecommerce: NO genera devoluciones. Da seguimiento a expedientes de Ecommerce,
+//   consulta resoluciones/responsables y registra incidencias de mercancía
+//   recibida en mal estado en el almacén Ecommerce (vía redistribución).
+// · Compras: revisa, autoriza, rechaza, gestiona, resuelve incidencias y cierra.
 // · Administrador: subrol de Compras con acceso a la configuración maestra.
 // ---------------------------------------------------------------------------
-import type { RoleKey, StatusKey, ReturnTypeKey, ReturnCase } from '../data/mock'
+import type { RoleKey, StatusKey, ReturnTypeKey, ReturnCase, IncidenciaStatus } from '../data/mock'
 
 // -------------------------- Acciones del expediente ------------------------
 
@@ -21,9 +23,11 @@ export type ActionKey =
   | 'comentar'
 
 // Qué roles pueden ejecutar cada acción.
+// Ecommerce es SOLO seguimiento sobre las devoluciones: no registra ni responde
+// (esas acciones son de Tienda); únicamente consulta, comenta e imprime.
 const ACTION_ROLES: Record<ActionKey, RoleKey[]> = {
-  tomar: ['tienda', 'ecommerce'], // registrar / enviar a revisión
-  responder_info: ['tienda', 'ecommerce'], // responder solicitudes de información
+  tomar: ['tienda'], // registrar / enviar a revisión
+  responder_info: ['tienda'], // responder solicitudes de información
   autorizar: ['compras'],
   rechazar: ['compras'],
   solicitar_info: ['compras'],
@@ -82,12 +86,18 @@ export type NavKey =
   | 'reportes'
   | 'catalogos'
   | 'configuracion'
+  | 'incidencias'
+  | 'nueva_incidencia'
+  | 'bloqueados'
+  | 'pendientes_resolucion'
+  | 'reportes_ecommerce'
 
 const NAV_BY_ROLE: Record<RoleKey, NavKey[]> = {
   // Tienda: portal operativo simple — crear, consultar y dar seguimiento.
   tienda: ['dashboard', 'devoluciones', 'nueva', 'pendientes'],
-  // Ecommerce: como Tienda pero para el canal en línea (sin masivas/reportes/catálogos).
-  ecommerce: ['dashboard', 'devoluciones', 'nueva', 'pendientes'],
+  // Ecommerce: NO crea devoluciones. Da seguimiento a devoluciones Ecommerce,
+  // gestiona incidencias de redistribución, ve productos bloqueados y reportes.
+  ecommerce: ['dashboard', 'pendientes_resolucion', 'incidencias', 'nueva_incidencia', 'devoluciones', 'bloqueados', 'reportes_ecommerce'],
   // Compras: interfaz corporativa completa. "configuracion" es solo para Administrador.
   compras: ['dashboard', 'devoluciones', 'nueva', 'pendientes', 'masivas', 'reportes', 'catalogos', 'configuracion'],
 }
@@ -136,6 +146,21 @@ export function ownershipFor(status: StatusKey): Ownership {
 /** ¿Este caso está esperando una acción del rol dado? (para "Mis pendientes"). */
 export function requiresActionFrom(role: RoleKey, c: ReturnCase): boolean {
   const area = ownershipFor(c.status).area
-  // Tienda y Ecommerce comparten el lado "Tienda" del ownership (registran / responden).
-  return role === 'compras' ? area === 'Compras' : area === 'Tienda'
+  if (role === 'compras') return area === 'Compras'
+  if (role === 'tienda') return area === 'Tienda'
+  // Ecommerce no actúa sobre devoluciones (solo seguimiento); sus pendientes
+  // se derivan de las incidencias, no de los expedientes de devolución.
+  return false
+}
+
+// -------------------------- Incidencias (Ecommerce) ------------------------
+
+/** La incidencia requiere respuesta de Ecommerce (Compras solicitó información). */
+export function incidenciaRequiresEcommerce(status: IncidenciaStatus): boolean {
+  return status === 'esperando'
+}
+
+/** La incidencia está pendiente de que Compras la revise o resuelva. */
+export function incidenciaRequiresCompras(status: IncidenciaStatus): boolean {
+  return status === 'abierta' || status === 'revision'
 }

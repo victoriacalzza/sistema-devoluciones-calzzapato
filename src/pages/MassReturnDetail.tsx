@@ -1,7 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import {
-  ChevronLeft,
   Building2,
   Layers,
   Clock,
@@ -13,7 +12,7 @@ import {
   Play,
 } from 'lucide-react'
 import { PageHeader } from '../components/AppLayout'
-import { Card, SectionTitle, StatusBadge, Avatar, Button, cn } from '../lib/ui'
+import { Card, SectionTitle, StatusBadge, Avatar, Button, BackLink, cn } from '../lib/ui'
 import { findMassReturn, personById, subPendiente, type MassSub, type TimelineEvent } from '../data/mock'
 
 const TIMELINE_DOT: Record<TimelineEvent['kind'], string> = {
@@ -52,9 +51,7 @@ export default function MassReturnDetail() {
 
   return (
     <div className="mx-auto max-w-[1200px] px-4 py-6 lg:px-8">
-      <button onClick={() => navigate('/masivas')} className="mb-3 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900">
-        <ChevronLeft className="h-4 w-4" /> Volver a masivas
-      </button>
+      <BackLink to="/masivas" label="Volver a Devoluciones masivas" />
 
       <PageHeader
         title={data.folio}

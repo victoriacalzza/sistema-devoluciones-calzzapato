@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Search, SlidersHorizontal, LayoutGrid, Rows3, Download, Calendar } from 'lucide-react'
+import { Search, SlidersHorizontal, LayoutGrid, Rows3, Calendar } from 'lucide-react'
 import { PageHeader } from '../components/AppLayout'
-import { Card, StatusBadge, PriorityBadge, Avatar, Button, Pill, cn } from '../lib/ui'
+import { Card, StatusBadge, PriorityBadge, Avatar, Button, Pill, BackLink, cn } from '../lib/ui'
+import { ExportMenu } from '../components/ExportMenu'
 import {
   RETURNS,
   STATUSES,
@@ -65,12 +66,40 @@ export default function Inbox() {
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-6 lg:px-8">
+      {role !== 'compras' && <BackLink to="/" label="Volver al inicio" />}
       <PageHeader
         title="Devoluciones"
         subtitle={`${rows.length} expedientes · ${role === 'ecommerce' ? 'Canal Ecommerce' : role === 'tienda' ? miSucursal || 'Mi sucursal' : 'Bandeja general'}`}
         actions={
           <>
-            <Button size="sm" variant="secondary" icon={<Download className="h-4 w-4" />}>Exportar</Button>
+            <ExportMenu
+              filename="devoluciones"
+              title="Reporte de devoluciones"
+              columns={[
+                { header: 'Folio', key: 'folio' },
+                { header: 'Tipo', key: 'tipo' },
+                { header: 'Producto', key: 'producto' },
+                { header: 'SKU', key: 'sku' },
+                { header: 'Sucursal', key: 'sucursal' },
+                { header: 'Cliente', key: 'cliente' },
+                { header: 'Marca', key: 'marca' },
+                { header: 'Estatus', key: 'estatus' },
+                { header: 'Prioridad', key: 'prioridad' },
+                { header: 'Responsable', key: 'responsable' },
+              ]}
+              rows={rows.map((r) => ({
+                folio: r.folio,
+                tipo: RETURN_TYPES[r.tipo].short,
+                producto: r.product.descripcion,
+                sku: r.product.sku,
+                sucursal: r.sucursal,
+                cliente: r.cliente,
+                marca: r.marca,
+                estatus: STATUSES[r.status].label,
+                prioridad: r.priority,
+                responsable: personById(r.responsableId).name,
+              }))}
+            />
             <div className="flex items-center rounded-lg border border-slate-200 bg-white p-0.5">
               <button
                 onClick={() => setView('tabla')}

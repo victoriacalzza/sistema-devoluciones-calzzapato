@@ -2,7 +2,8 @@ import { Layers, Plus, Building2, ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '../components/AppLayout'
 import { Card, StatusBadge, Button, cn } from '../lib/ui'
-import { MASS_RETURNS, subPendiente, type MassSub } from '../data/mock'
+import { ExportMenu } from '../components/ExportMenu'
+import { MASS_RETURNS, STATUSES, subPendiente, type MassSub } from '../data/mock'
 
 function pct(subs: MassSub[]) {
   const sol = subs.reduce((a, s) => a + s.solicitado, 0)
@@ -17,7 +18,39 @@ export default function MassReturns() {
       <PageHeader
         title="Devoluciones masivas"
         subtitle="Retiros de lote solicitados por Compras · avance de cumplimiento por sucursal"
-        actions={<Button variant="primary" icon={<Plus className="h-5 w-5" />} onClick={() => navigate('/nueva')}>Nueva devolución masiva</Button>}
+        actions={
+          <>
+            <ExportMenu
+              filename="devoluciones-masivas"
+              title="Reporte de devoluciones masivas"
+              columns={[
+                { header: 'Folio', key: 'folio' },
+                { header: 'Lote', key: 'lote' },
+                { header: 'Marca', key: 'marca' },
+                { header: 'Sucursal', key: 'sucursal' },
+                { header: 'Solicitado', key: 'solicitado' },
+                { header: 'Enviado', key: 'enviado' },
+                { header: 'Recibido', key: 'recibido' },
+                { header: 'Pendiente', key: 'pendiente' },
+                { header: 'Estatus', key: 'estatus' },
+              ]}
+              rows={MASS_RETURNS.flatMap((m) =>
+                m.subs.map((s) => ({
+                  folio: m.folio,
+                  lote: m.lote,
+                  marca: m.marca,
+                  sucursal: s.sucursal,
+                  solicitado: s.solicitado,
+                  enviado: s.enviado,
+                  recibido: s.recibido,
+                  pendiente: subPendiente(s),
+                  estatus: STATUSES[s.status].label,
+                })),
+              )}
+            />
+            <Button variant="primary" icon={<Plus className="h-5 w-5" />} onClick={() => navigate('/nueva')}>Nueva devolución masiva</Button>
+          </>
+        }
       />
 
       {MASS_RETURNS.length === 0 && (

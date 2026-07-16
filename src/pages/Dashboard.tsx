@@ -28,9 +28,16 @@ import {
   Search,
   Layers,
   History,
+  TriangleAlert,
+  Ban,
+  CheckCircle2,
+  Hourglass,
+  ClipboardList,
+  BarChart3,
 } from 'lucide-react'
 import { PageHeader } from '../components/AppLayout'
 import { Card, KpiCard, SectionTitle, StatusBadge, Avatar, Button, cn } from '../lib/ui'
+import { ExportMenu } from '../components/ExportMenu'
 import {
   byProducto,
   byProveedor,
@@ -44,7 +51,12 @@ import {
   RETURNS,
   personById,
   RETURN_TYPES,
+  INCIDENCIAS,
+  ECOMMERCE_KPIS,
+  INCIDENCIA_STATUS,
+  devolucionesPendientesResolucion,
   type ReturnCase,
+  type Incidencia,
 } from '../data/mock'
 import { useRole } from '../lib/RoleContext'
 
@@ -345,34 +357,28 @@ function ActionCard({
 }
 
 // ---------------------------------------------------------------------------
-// Portal operativo de TIENDA / ECOMMERCE — sin ERP, enfocado en operación.
+// Portal operativo de TIENDA — sin ERP, enfocado en operación.
 // Vistas: Nueva devolución · Mis devoluciones · Pendientes de información ·
 // Casos en tránsito · Casos rechazados.
 // ---------------------------------------------------------------------------
 
-function OperationalPortal({ channel }: { channel: 'tienda' | 'ecommerce' }) {
+function OperationalPortal() {
   const navigate = useNavigate()
   const { user } = useRole()
 
   const sucursal = user.role.includes('·') ? user.role.split('·')[1].trim() : ''
   const firstName = user.name.split(' ')[0]
-  // Ecommerce ve los expedientes del canal en línea; Tienda los de su sucursal.
-  const mine =
-    channel === 'ecommerce'
-      ? RETURNS.filter((r) => r.tipo === 'ecommerce')
-      : RETURNS.filter((r) => r.sucursal === sucursal || r.creadorId === user.id)
+  const mine = RETURNS.filter((r) => r.sucursal === sucursal || r.creadorId === user.id)
 
   const infoPend = mine.filter((r) => r.status === 'esperando')
   const enTransito = mine.filter((r) => r.status === 'transito' || r.status === 'recibido')
   const rechazadas = mine.filter((r) => r.status === 'rechazado')
 
-  const scopeLabel = channel === 'ecommerce' ? 'canal Ecommerce' : sucursal || 'tu sucursal'
-
   return (
     <div className="mx-auto max-w-[960px] px-4 py-8 lg:px-6">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Hola, {firstName} 👋</h1>
-        <p className="mt-1 text-sm text-slate-500">Portal de devoluciones · {scopeLabel}</p>
+        <p className="mt-1 text-sm text-slate-500">Portal de devoluciones · {sucursal || 'tu sucursal'}</p>
       </div>
 
       {/* Vistas principales — cada tarjeta abre una pantalla con todos los casos */}
@@ -387,6 +393,143 @@ function OperationalPortal({ channel }: { channel: 'tienda' | 'ecommerce' }) {
       {/* Lo que ha pasado en tus expedientes */}
       <div className="mt-8">
         <RecentActivity cases={mine} />
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Lista compacta de incidencias — widget del portal Ecommerce.
+// ---------------------------------------------------------------------------
+
+function IncidenciaListCard({ title, icon, items, emptyText, onSeeAll }: {
+  title: string
+  icon?: React.ReactNode
+  items: Incidencia[]
+  emptyText: string
+  onSeeAll?: () => void
+}) {
+  const navigate = useNavigate()
+  return (
+    <Card padded={false}>
+      <div className="flex items-center justify-between px-5 py-4">
+        <div className="flex items-center gap-2">
+          {icon && <span className="text-slate-500">{icon}</span>}
+          <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">{items.length}</span>
+        </div>
+        {onSeeAll && (
+          <Button size="sm" variant="ghost" icon={<ArrowRight className="h-4 w-4" />} onClick={onSeeAll}>Ver todas</Button>
+        )}
+      </div>
+      <div className="divide-y divide-slate-50 border-t border-slate-100">
+        {items.map((i) => {
+          const resp = personById(i.responsableId)
+          const st = INCIDENCIA_STATUS[i.status]
+          return (
+            <button key={i.folio} onClick={() => navigate(`/incidencias/${i.folio}`)} className="flex w-full items-center gap-4 px-5 py-3 text-left hover:bg-slate-50">
+              <img src={i.image} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs font-semibold text-slate-900">{i.folio}</span>
+                  <span className="text-xs text-slate-500">{i.motivo}</span>
+                </div>
+                <p className="mt-0.5 truncate text-sm text-slate-500">{i.producto}</p>
+              </div>
+              <div className="hidden text-right sm:block">
+                <div className="text-xs text-slate-500">{i.sucursalOrigen}</div>
+                <div className="text-[11px] text-slate-500">Rel. {i.relacionado}</div>
+              </div>
+              <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium', st.bg, st.text)}>
+                <span className={cn('h-1.5 w-1.5 rounded-full', st.dot)} />{st.label}
+              </span>
+              <Avatar person={resp} size="sm" />
+            </button>
+          )
+        })}
+        {items.length === 0 && <div className="px-5 py-12 text-center text-sm text-slate-500">{emptyText}</div>}
+      </div>
+    </Card>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Portal ECOMMERCE — sin ERP. Enfocado en incidencias del almacén Ecommerce.
+// Ecommerce NO genera devoluciones: recibe mercancía por redistribución,
+// inspecciona y registra incidencias. KPIs + bandejas de incidencias.
+// ---------------------------------------------------------------------------
+
+function EcommercePortal() {
+  const navigate = useNavigate()
+  const { user } = useRole()
+  const firstName = user.name.split(' ')[0]
+
+  const pendientesResolucion = devolucionesPendientesResolucion()
+  const incidenciasActivas = INCIDENCIAS.filter((i) => i.status !== 'cerrada' && i.status !== 'resuelta')
+
+  return (
+    <div className="mx-auto max-w-[1100px] px-4 py-8 lg:px-6">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Hola, {firstName} 👋</h1>
+          <p className="mt-1 text-sm text-slate-500">Portal de incidencias · Almacén Ecommerce</p>
+        </div>
+        <Button variant="primary" icon={<Plus className="h-5 w-5" />} onClick={() => navigate('/incidencias/nueva')}>
+          Registrar incidencia
+        </Button>
+      </div>
+
+      {/* KPIs de incidencias */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <KpiCard label="Incidencias abiertas" value={ECOMMERCE_KPIS.abiertas} accent="warning" icon={<TriangleAlert className="h-4 w-4" />} />
+        <KpiCard label="Pendientes de revisión" value={ECOMMERCE_KPIS.pendientesRevision} icon={<ClipboardList className="h-4 w-4" />} />
+        <KpiCard label="Resueltas" value={ECOMMERCE_KPIS.resueltas} accent="success" icon={<CheckCircle2 className="h-4 w-4" />} />
+        <KpiCard label="Productos bloqueados" value={ECOMMERCE_KPIS.bloqueados} accent="danger" icon={<Ban className="h-4 w-4" />} />
+        <KpiCard label="Tiempo prom. resolución" value={ECOMMERCE_KPIS.tiempoResolucion} icon={<Timer className="h-4 w-4" />} />
+      </div>
+
+      {/* Módulos de trabajo */}
+      <div className="mt-4 mb-2 px-1 text-xs font-medium uppercase tracking-wide text-slate-500">Módulos</div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <ActionCard
+          primary
+          title="Pendientes de resolución Ecommerce"
+          desc="Productos devueltos en tienda física pendientes de resolución por Compras que impactan inventario Ecommerce."
+          icon={<Hourglass className="h-6 w-6" />}
+          badge={pendientesResolucion.length}
+          onClick={() => navigate('/pendientes-resolucion')}
+        />
+        <ActionCard
+          title="Incidencias de redistribución"
+          desc="Productos recibidos por redistribución entre sucursales que llegaron en mal estado (solo activas)."
+          icon={<TriangleAlert className="h-6 w-6" />}
+          badge={incidenciasActivas.length}
+          onClick={() => navigate('/incidencias?estado=abiertas')}
+        />
+        <ActionCard
+          title="Productos bloqueados para Ecommerce"
+          desc="Permanecen disponibles únicamente para venta física en tienda."
+          icon={<Ban className="h-6 w-6" />}
+          badge={ECOMMERCE_KPIS.bloqueados}
+          onClick={() => navigate('/bloqueados')}
+        />
+        <ActionCard
+          title="Reportes Ecommerce"
+          desc="Dashboard analítico con filtros y exportación (Excel / PDF)."
+          icon={<BarChart3 className="h-6 w-6" />}
+          onClick={() => navigate('/reportes-ecommerce')}
+        />
+      </div>
+
+      {/* Incidencias recientes */}
+      <div className="mt-8">
+        <IncidenciaListCard
+          title="Incidencias recientes"
+          icon={<TriangleAlert className="h-4 w-4" />}
+          items={INCIDENCIAS.slice(0, 5)}
+          emptyText="No hay incidencias registradas."
+          onSeeAll={() => navigate('/incidencias')}
+        />
       </div>
     </div>
   )
@@ -408,9 +551,20 @@ function ComprasDashboard() {
         title="Dashboard operativo"
         subtitle="Prioriza autorizaciones y detecta incidencias · Compras"
         actions={
-          <Button size="sm" variant="ghost" icon={<Sparkles className="h-4 w-4 text-brand-600" />} onClick={() => navigate('/reportes')}>
-            Ver reportes
-          </Button>
+          <>
+            <ExportMenu
+              filename="reporte-operativo-compras"
+              title="Reporte operativo · Compras"
+              columns={[
+                { header: 'Producto', key: 'name' },
+                { header: 'Incidencias', key: 'value' },
+              ]}
+              rows={byProducto.map((d) => ({ name: d.name, value: d.value }))}
+            />
+            <Button size="sm" variant="ghost" icon={<Sparkles className="h-4 w-4 text-brand-600" />} onClick={() => navigate('/reportes')}>
+              Ver reportes
+            </Button>
+          </>
         }
       />
 
@@ -456,7 +610,7 @@ function ComprasDashboard() {
 
 export default function Dashboard() {
   const { role } = useRole()
-  if (role === 'tienda') return <OperationalPortal channel="tienda" />
-  if (role === 'ecommerce') return <OperationalPortal channel="ecommerce" />
+  if (role === 'tienda') return <OperationalPortal />
+  if (role === 'ecommerce') return <EcommercePortal />
   return <ComprasDashboard />
 }

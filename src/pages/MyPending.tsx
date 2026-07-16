@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { Clock, ArrowRight, Inbox } from 'lucide-react'
 import { PageHeader } from '../components/AppLayout'
-import { Card, StatusBadge, PriorityBadge, Avatar, Button, KpiCard, cn } from '../lib/ui'
+import { Card, StatusBadge, PriorityBadge, Avatar, Button, KpiCard, BackLink, cn } from '../lib/ui'
 import { RETURNS, personById, RETURN_TYPES } from '../data/mock'
 import { useRole } from '../lib/RoleContext'
 import { requiresActionFrom, ownershipFor } from '../lib/permissions'
@@ -17,6 +17,7 @@ export default function MyPending() {
 
   return (
     <div className="mx-auto max-w-[1200px] px-4 py-6 lg:px-8">
+      {role !== 'compras' && <BackLink to="/" label="Volver al inicio" />}
       <PageHeader
         title="Mis pendientes"
         subtitle={`Bandeja de trabajo de ${user.name} · ${user.role}`}
