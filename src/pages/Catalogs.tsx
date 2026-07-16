@@ -96,22 +96,28 @@ export default function Catalogs() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-medium text-slate-500">
-                    <th className="px-4 py-2.5">Tipo de almacén</th>
-                    <th className="px-4 py-2.5">Línea de mercancía</th>
-                    <th className="px-4 py-2.5">Nombre</th>
+                    <th className="px-4 py-2.5">Código</th>
+                    <th className="px-4 py-2.5">Almacén</th>
+                    <th className="px-4 py-2.5">Líneas de mercancía</th>
                     <th className="px-4 py-2.5">Estatus</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {ALMACENES.map((a, i) => (
-                    <tr key={i} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
+                  {ALMACENES.map((a) => (
+                    <tr key={a.codigo} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
                       <td className="px-4 py-3">
-                        <span className="flex items-center gap-2 font-medium text-slate-900"><Warehouse className="h-4 w-4 text-slate-400" /> {a.tipo}</span>
+                        <span className="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs font-medium text-slate-600">{a.codigo}</span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={cn('rounded-md px-2 py-0.5 text-xs font-medium', a.linea === 'General' ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-700')}>{a.linea}</span>
+                        <span className="flex items-center gap-2 font-medium text-slate-900"><Warehouse className="h-4 w-4 text-slate-400" /> {a.nombre}</span>
                       </td>
-                      <td className="px-4 py-3 text-slate-700">{a.nombre}</td>
+                      <td className="px-4 py-3">
+                        <span className="flex flex-wrap gap-1">
+                          {a.lineas.map((l) => (
+                            <span key={l} className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{l}</span>
+                          ))}
+                        </span>
+                      </td>
                       <td className="px-4 py-3"><span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">Activo</span></td>
                     </tr>
                   ))}

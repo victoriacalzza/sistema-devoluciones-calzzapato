@@ -271,40 +271,28 @@ export function agrupacionForMarca(marca: string): string | undefined {
 // Compras elige obligatoriamente un almacén destino al autorizar (configurable).
 
 // -------------------- Catálogo de almacenes destino ------------------------
-// No existe un único almacén: hay varios tipos por destino/mercancía. El sistema
-// recomienda los compatibles con la LÍNEA del producto (calzado/accesorios/textil).
+// Catálogo real de almacenes. Cada uno aplica a una o más LÍNEAS de mercancía
+// (calzado / textil / accesorios). Al autorizar y elegir resolución, el sistema
+// detecta la línea del producto y muestra SOLO los almacenes válidos.
 // Administrable por Compras · Administrador.
 
 export type LineaMercancia = 'Calzado' | 'Accesorios' | 'Textil'
 
 export interface Almacen {
+  /** Código del almacén (ej. "25", "281", "GL"). */
+  codigo: string
   nombre: string
-  tipo: string
-  /** Línea de mercancía a la que aplica; "General" aplica a todas. */
-  linea: LineaMercancia | 'General'
+  /** Líneas de mercancía para las que el almacén es válido. */
+  lineas: LineaMercancia[]
 }
 
 export const ALMACENES: Almacen[] = [
-  // Calzado
-  { nombre: 'Centro de devoluciones calzado', tipo: 'Centro de devoluciones', linea: 'Calzado' },
-  { nombre: 'Choix calzado', tipo: 'Choix', linea: 'Calzado' },
-  { nombre: 'Donación calzado', tipo: 'Donación', linea: 'Calzado' },
-  { nombre: 'Redistribución calzado', tipo: 'Redistribución', linea: 'Calzado' },
-  // Accesorios
-  { nombre: 'Centro de devoluciones accesorios', tipo: 'Centro de devoluciones', linea: 'Accesorios' },
-  { nombre: 'Choix accesorios', tipo: 'Choix', linea: 'Accesorios' },
-  { nombre: 'Donación accesorios', tipo: 'Donación', linea: 'Accesorios' },
-  { nombre: 'Redistribución accesorios', tipo: 'Redistribución', linea: 'Accesorios' },
-  // Textil
-  { nombre: 'Centro de devoluciones textil', tipo: 'Centro de devoluciones', linea: 'Textil' },
-  { nombre: 'Choix textil', tipo: 'Choix', linea: 'Textil' },
-  { nombre: 'Donación textil', tipo: 'Donación', linea: 'Textil' },
-  { nombre: 'Redistribución textil', tipo: 'Redistribución', linea: 'Textil' },
-  // Generales (aplican a cualquier línea)
-  { nombre: 'Liquidaciones', tipo: 'Liquidaciones', linea: 'General' },
-  { nombre: 'Merma', tipo: 'Merma', linea: 'General' },
-  { nombre: 'Recuperable', tipo: 'Recuperable', linea: 'General' },
-  { nombre: 'No recuperable', tipo: 'No recuperable', linea: 'General' },
+  { codigo: '25', nombre: 'Devolución de fábrica', lineas: ['Calzado'] },
+  { codigo: '512', nombre: 'Kelder Defectuosos textil', lineas: ['Textil'] },
+  { codigo: '24', nombre: 'Accesorios defectuosos', lineas: ['Accesorios'] },
+  { codigo: '281', nombre: 'Devoluciones Masivas', lineas: ['Calzado', 'Textil'] },
+  { codigo: '262', nombre: 'Venta outlet', lineas: ['Calzado', 'Textil', 'Accesorios'] },
+  { codigo: 'GL', nombre: 'Almacén Donaciones', lineas: ['Calzado', 'Textil', 'Accesorios'] },
 ]
 
 /** Identifica la línea de mercancía del producto (por marca/categoría). */
@@ -314,12 +302,9 @@ export function lineaMercancia(marca: string, categoria: string): LineaMercancia
   return 'Calzado'
 }
 
-/** Almacenes recomendados (compatibles con la línea) y el resto ("Otros"). */
-export function almacenesRecomendados(linea: LineaMercancia): Almacen[] {
-  return ALMACENES.filter((a) => a.linea === linea)
-}
-export function otrosAlmacenes(linea: LineaMercancia): Almacen[] {
-  return ALMACENES.filter((a) => a.linea !== linea)
+/** Almacenes válidos para la línea de mercancía detectada. */
+export function almacenesFor(linea: LineaMercancia): Almacen[] {
+  return ALMACENES.filter((a) => a.lineas.includes(linea))
 }
 
 // -------------------- Resoluciones de autorización -------------------------

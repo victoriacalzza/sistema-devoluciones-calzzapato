@@ -31,7 +31,6 @@ import {
   Warehouse,
   Play,
   Video,
-  ChevronDown,
   Ban,
   Store,
 } from 'lucide-react'
@@ -44,8 +43,7 @@ import {
   RESOLUTIONS,
   resolucionesFor,
   lineaMercancia,
-  almacenesRecomendados,
-  otrosAlmacenes,
+  almacenesFor,
   VIDEO_SAMPLE,
   RETURN_TYPES,
   type Comment,
@@ -138,7 +136,6 @@ export default function ReturnDetail() {
   const [authStep, setAuthStep] = useState<'res' | 'alm' | null>(null)
   const [wizRes, setWizRes] = useState<ResolucionOption | null>(null)
   const [wizAlmacen, setWizAlmacen] = useState('')
-  const [showOtros, setShowOtros] = useState(false)
   // Estatus reactivo (prototipo): las acciones lo cambian y se refleja en la UI.
   const [status, setStatus] = useState<StatusKey>(data?.status ?? 'nuevo')
   const [events, setEvents] = useState<TimelineEvent[]>(() => {
@@ -183,8 +180,7 @@ export default function ReturnDetail() {
   const existencias = existenciasFor(data.lote)
   // Línea de mercancía del expediente → almacenes recomendados (compatibles) vs. otros.
   const linea = lineaMercancia(data.marca, data.categoria)
-  const almRecomendados = almacenesRecomendados(linea)
-  const almOtros = otrosAlmacenes(linea)
+  const almacenesValidos = almacenesFor(linea)
 
   function logEvent(text: string, kind: TimelineEvent['kind']) {
     setEvents((e) => [...e, { date: 'Hoy', time: 'ahora', actor: user.name, text, kind }])
@@ -794,62 +790,29 @@ export default function ReturnDetail() {
                 </p>
                 <div className="mt-3 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
                   <Warehouse className="h-4 w-4 text-slate-500" />
-                  Línea de mercancía detectada: <span className="font-medium text-slate-800">{linea}</span>. Se recomiendan los almacenes compatibles; la decisión final es tuya.
+                  Línea de mercancía detectada: <span className="font-medium text-slate-800">{linea}</span>. Solo se muestran los almacenes válidos para esta línea.
                 </div>
 
-                {/* Recomendados (compatibles con la línea) */}
-                <p className="mt-4 mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">Recomendados · {linea}</p>
-                <div className="space-y-2">
-                  {almRecomendados.map((a) => (
+                {/* Almacenes válidos según la línea de mercancía */}
+                <div className="mt-4 space-y-2">
+                  {almacenesValidos.map((a) => (
                     <button
-                      key={a.nombre}
+                      key={a.codigo}
                       onClick={() => setWizAlmacen(a.nombre)}
                       className={cn(
                         'flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm hover:border-brand-300 hover:bg-brand-50/40',
-                        wizAlmacen === a.nombre ? 'border-brand-300 bg-brand-50 font-medium text-brand-700' : 'border-emerald-200 bg-emerald-50/40 text-slate-700',
+                        wizAlmacen === a.nombre ? 'border-brand-300 bg-brand-50 font-medium text-brand-700' : 'border-slate-200 text-slate-700',
                       )}
                     >
                       <span className="flex items-center gap-2">
-                        <Warehouse className="h-4 w-4 text-emerald-600" />
-                        <span>{a.tipo}</span>
-                        <span className="text-slate-400">·</span>
-                        <span className="text-slate-500">{a.nombre}</span>
+                        <Warehouse className="h-4 w-4 text-slate-400" />
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-600">{a.codigo}</span>
+                        <span>{a.nombre}</span>
                       </span>
                       {wizAlmacen === a.nombre && <Check className="h-4 w-4 text-brand-600" />}
                     </button>
                   ))}
                 </div>
-
-                {/* Otros almacenes (colapsable) */}
-                <button
-                  onClick={() => setShowOtros((v) => !v)}
-                  className="mt-4 flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700"
-                >
-                  Otros almacenes ({almOtros.length})
-                  <ChevronDown className={cn('h-4 w-4 transition-transform', showOtros && 'rotate-180')} />
-                </button>
-                {showOtros && (
-                  <div className="mt-2 space-y-2">
-                    {almOtros.map((a) => (
-                      <button
-                        key={a.nombre}
-                        onClick={() => setWizAlmacen(a.nombre)}
-                        className={cn(
-                          'flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm hover:border-brand-300 hover:bg-brand-50/40',
-                          wizAlmacen === a.nombre ? 'border-brand-300 bg-brand-50 font-medium text-brand-700' : 'border-slate-200 text-slate-700',
-                        )}
-                      >
-                        <span className="flex items-center gap-2">
-                          <Warehouse className="h-4 w-4 text-slate-400" />
-                          <span>{a.tipo}</span>
-                          <span className="text-slate-400">·</span>
-                          <span className="text-slate-500">{a.nombre}</span>
-                        </span>
-                        {wizAlmacen === a.nombre && <Check className="h-4 w-4 text-brand-600" />}
-                      </button>
-                    ))}
-                  </div>
-                )}
 
                 <div className="mt-5 flex justify-between gap-2">
                   <Button variant="ghost" onClick={() => setAuthStep('res')}>Atrás</Button>
