@@ -1589,6 +1589,7 @@ export interface TrasladoProducto {
   talla: string
   color: string
   image: string
+  linea?: string
 }
 
 export interface Traslado {
@@ -1653,35 +1654,41 @@ export interface Venta {
   folio: string
   tipo: 'cliente' | 'ecommerce'
   cliente: string
-  sucursal: string
+  /** Fecha de la compra original. */
   fecha: string
+  /**
+   * Sucursal donde se realizó la compra original. Solo aplica a ventas de
+   * tienda física (cliente). Las compras Ecommerce NO tienen sucursal física
+   * asociada a la venta original, por lo que este dato queda vacío y no se muestra.
+   */
+  sucursalCompra?: string
   productos: TrasladoProducto[]
 }
 
 const VENTAS: Venta[] = [
   {
-    folio: 'FA-CUL-88231', tipo: 'cliente', cliente: 'Laura Sánchez Medina', sucursal: 'Culiacán Centro', fecha: '28 jun 2026',
+    folio: 'FA-CUL-88231', tipo: 'cliente', cliente: 'Laura Sánchez Medina', sucursalCompra: 'Culiacán Centro', fecha: '28 jun 2026',
     productos: [
-      { sku: 'NK-AJ1-2291', descripcion: 'Tenis Nike Air Jordan 1 Mid — Negro/Rojo', marca: 'Nike', proveedor: 'Nike México', lote: 'LT-NK-2291', talla: '27 MX', color: 'Negro / Rojo', image: IMG.sneakerRed },
-      { sku: 'NK-CALC-01', descripcion: 'Calcetas Nike Everyday (3 pares)', marca: 'Nike', proveedor: 'Nike México', lote: 'LT-NK-CALC', talla: 'Única', color: 'Blanco', image: IMG.boxShoes },
+      { sku: 'NK-AJ1-2291', descripcion: 'Tenis Nike Air Jordan 1 Mid — Negro/Rojo', marca: 'Nike', proveedor: 'Nike México', linea: 'Calzado deportivo', lote: 'LT-NK-2291', talla: '27 MX', color: 'Negro / Rojo', image: IMG.sneakerRed },
+      { sku: 'NK-CALC-01', descripcion: 'Calcetas Nike Everyday (3 pares)', marca: 'Nike', proveedor: 'Nike México', linea: 'Accesorios', lote: 'LT-NK-CALC', talla: 'Única', color: 'Blanco', image: IMG.boxShoes },
     ],
   },
   {
-    folio: 'FA-FOR-77120', tipo: 'cliente', cliente: 'Patricia Vega', sucursal: 'Culiacán Forum', fecha: '15 jun 2026',
+    folio: 'FA-FOR-77120', tipo: 'cliente', cliente: 'Patricia Vega', sucursalCompra: 'Culiacán Forum', fecha: '15 jun 2026',
     productos: [
-      { sku: 'AN-ZP-5510', descripcion: 'Zapatilla Andrea tacón medio — Nude', marca: 'Andrea', proveedor: 'Grupo Andrea', lote: 'LT-AN-5510', talla: '24 MX', color: 'Nude', image: IMG.heels },
+      { sku: 'AN-ZP-5510', descripcion: 'Zapatilla Andrea tacón medio — Nude', marca: 'Andrea', proveedor: 'Grupo Andrea', linea: 'Calzado dama', lote: 'LT-AN-5510', talla: '24 MX', color: 'Nude', image: IMG.heels },
     ],
   },
   {
-    folio: 'EC-99120', tipo: 'ecommerce', cliente: 'Roberto Gil', sucursal: 'Guadalajara Andares', fecha: '22 jun 2026',
+    folio: 'EC-99120', tipo: 'ecommerce', cliente: 'Roberto Gil', fecha: '22 jun 2026',
     productos: [
-      { sku: 'AD-UB-1180', descripcion: 'Tenis Adidas Ultraboost Light — Blanco', marca: 'Adidas', proveedor: 'Adidas México', lote: 'LT-AD-1180', talla: '28 MX', color: 'Blanco', image: IMG.sneakerWhite },
+      { sku: 'AD-UB-1180', descripcion: 'Tenis Adidas Ultraboost Light — Blanco', marca: 'Adidas', proveedor: 'Adidas México', linea: 'Calzado deportivo', lote: 'LT-AD-1180', talla: '28 MX', color: 'Blanco', image: IMG.sneakerWhite },
     ],
   },
   {
-    folio: 'EC-98004', tipo: 'ecommerce', cliente: 'Sofía Torres', sucursal: 'Guasave Centro', fecha: '20 jun 2026',
+    folio: 'EC-98004', tipo: 'ecommerce', cliente: 'Sofía Torres', fecha: '20 jun 2026',
     productos: [
-      { sku: 'CH-BG-1200', descripcion: 'Bolsa Coach Willow — Café', marca: 'Coach', proveedor: 'VF Corp', lote: 'LT-CH-1200', talla: 'Única', color: 'Café', image: IMG.bag },
+      { sku: 'CH-BG-1200', descripcion: 'Bolsa Coach Willow — Café', marca: 'Coach', proveedor: 'VF Corp', linea: 'Accesorios', lote: 'LT-CH-1200', talla: 'Única', color: 'Café', image: IMG.bag },
     ],
   },
 ]
@@ -1690,8 +1697,8 @@ const VENTAS: Venta[] = [
 const DEVOLUCIONES_ACTIVAS = ['FA-FOR-77120', 'EC-98004']
 
 const VENTA_DEFAULT_PRODUCTOS: TrasladoProducto[] = [
-  { sku: 'NK-AJ1-2291', descripcion: 'Tenis Nike Air Jordan 1 Mid — Negro/Rojo', marca: 'Nike', proveedor: 'Nike México', lote: 'LT-NK-2291', talla: '27 MX', color: 'Negro / Rojo', image: IMG.sneakerRed },
-  { sku: 'SK-GW-4410', descripcion: 'Skechers Go Walk — Azul marino', marca: 'Skechers', proveedor: 'VF Corp', lote: 'LT-SK-4410', talla: '27 MX', color: 'Azul marino', image: IMG.sneakerWhite },
+  { sku: 'NK-AJ1-2291', descripcion: 'Tenis Nike Air Jordan 1 Mid — Negro/Rojo', marca: 'Nike', proveedor: 'Nike México', linea: 'Calzado deportivo', lote: 'LT-NK-2291', talla: '27 MX', color: 'Negro / Rojo', image: IMG.sneakerRed },
+  { sku: 'SK-GW-4410', descripcion: 'Skechers Go Walk — Azul marino', marca: 'Skechers', proveedor: 'VF Corp', linea: 'Calzado deportivo', lote: 'LT-SK-4410', talla: '27 MX', color: 'Azul marino', image: IMG.sneakerWhite },
 ]
 
 export interface BusquedaVenta {
@@ -1707,9 +1714,12 @@ export function buscarVenta(tipo: 'cliente' | 'ecommerce', folio: string): Busqu
   const found = VENTAS.find((v) => v.tipo === tipo && v.folio.toLowerCase() === q.toLowerCase())
   const devolucionActiva = DEVOLUCIONES_ACTIVAS.some((f) => f.toLowerCase() === q.toLowerCase())
   // Prototipo: cualquier folio no vacío "existe"; si no está en el catálogo se
-  // devuelve una venta genérica para poder continuar el flujo.
+  // devuelve una venta genérica para poder continuar el flujo. Para cliente se
+  // incluye una sucursal de compra original; para ecommerce no aplica.
   const venta: Venta = found ?? {
-    folio: q, tipo, cliente: '—', sucursal: SUCURSALES[0], fecha: '—', productos: VENTA_DEFAULT_PRODUCTOS,
+    folio: q, tipo, cliente: '—', fecha: '28 jun 2026',
+    sucursalCompra: tipo === 'cliente' ? SUCURSALES[0] : undefined,
+    productos: VENTA_DEFAULT_PRODUCTOS,
   }
   return { venta, existe: true, devolucionActiva }
 }

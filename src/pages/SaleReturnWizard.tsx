@@ -23,7 +23,6 @@ import {
   buscarVenta,
   supervisorByCode,
   SUCURSALES,
-  GERENTES,
   RETURN_TYPES,
   type BusquedaVenta,
   type TrasladoProducto,
@@ -76,7 +75,7 @@ const STEPS = [
   { n: 1, title: 'Identificar venta' },
   { n: 2, title: 'Seleccionar producto' },
   { n: 3, title: 'Información de la incidencia' },
-  { n: 4, title: 'Evidencia' },
+  { n: 4, title: 'Evidencia y autorización' },
 ]
 
 const SMS_TTL = 300 // 5 minutos de vigencia
@@ -108,7 +107,6 @@ export default function SaleReturnWizard({ type, allowMultipleTypes, onChangeTyp
 
   // Paso 3 — incidencia + SMS supervisor
   const [lote, setLote] = useState('')
-  const [gerente, setGerente] = useState('')
   const [smsSent, setSmsSent] = useState(false)
   const [smsCode, setSmsCode] = useState('')
   const [smsLeft, setSmsLeft] = useState(0)
@@ -205,6 +203,9 @@ export default function SaleReturnWizard({ type, allowMultipleTypes, onChangeTyp
       if (target) URL.revokeObjectURL(target.url)
       return prev.filter((x) => x.id !== id)
     })
+    // El supervisor autoriza sobre la evidencia visible: si esta cambia, se
+    // invalida cualquier solicitud o autorización previa.
+    setSmsSent(false); setSmsAuth(null); setSmsCode(''); setSmsError(''); setSmsIntentos(0); setSmsLeft(0)
   }
   const uploading = files.some((f) => f.status === 'uploading')
   const ready = files.filter((f) => f.status === 'done')
@@ -217,14 +218,14 @@ export default function SaleReturnWizard({ type, allowMultipleTypes, onChangeTyp
   const stepValid: Record<number, boolean> = {
     1: !!busq?.existe && !busq?.devolucionActiva && !!cliente.trim() && !!sucursal,
     2: !!selSku,
-    3: !!lote.trim() && !!gerente.trim() && !!smsAuth,
-    4: fotos >= 1 && !uploading,
+    3: !!lote.trim(),
+    4: fotos >= 1 && !uploading && !!smsAuth,
   }
 
   function resetAll() {
     files.forEach((f) => URL.revokeObjectURL(f.url))
     setStep(1); setDone(false); setFolio(''); setCliente(''); setSucursal(''); setBusq(null); setBuscado(false)
-    setSelSku(''); setLote(''); setGerente(''); setSmsSent(false); setSmsCode(''); setSmsLeft(0); setSmsIntentos(0); setSmsError(''); setSmsAuth(null)
+    setSelSku(''); setLote(''); setSmsSent(false); setSmsCode(''); setSmsLeft(0); setSmsIntentos(0); setSmsError(''); setSmsAuth(null)
     setFiles([]); setFileErrors([])
   }
 
@@ -323,11 +324,22 @@ export default function SaleReturnWizard({ type, allowMultipleTypes, onChangeTyp
                 <p className="mt-1 text-xs">Solo puede existir una devolución activa por {isEcom ? 'ID de venta' : 'factura'}. No es posible continuar.</p>
               </div>
             )}
-            {buscado && busq?.existe && !busq.devolucionActiva && (
+            {buscado && busq?.existe && !busq.devolucionActiva && busq.venta && (
               <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
-                <div className="flex items-center gap-1.5 text-sm font-medium text-emerald-800"><Check className="h-4 w-4" /> {isEcom ? 'Venta' : 'Factura'} válida · {busq.venta?.productos.length} producto(s) encontrados</div>
+                <div className="flex items-center gap-1.5 text-sm font-medium text-emerald-800"><Check className="h-4 w-4" /> {isEcom ? 'Venta' : 'Factura'} válida · {busq.venta.productos.length} producto(s) encontrados</div>
+                {/* Datos obtenidos automáticamente de la venta — solo informativos, no editables */}
+                <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 rounded-lg border border-emerald-100 bg-white/70 p-3 text-xs sm:grid-cols-2">
+                  <div className="flex justify-between gap-2"><span className="text-slate-500">Cliente</span><span className="font-medium text-slate-700">{busq.venta.cliente}</span></div>
+                  <div className="flex justify-between gap-2"><span className="text-slate-500">Fecha de compra</span><span className="font-medium text-slate-700">{busq.venta.fecha}</span></div>
+                  {!isEcom && busq.venta.sucursalCompra && (
+                    <div className="flex justify-between gap-2 sm:col-span-2">
+                      <span className="text-slate-500">Sucursal de compra original</span>
+                      <span className="font-medium text-slate-700">{busq.venta.sucursalCompra} <span className="font-normal text-slate-400">· solo informativo</span></span>
+                    </div>
+                  )}
+                </div>
                 <ul className="mt-2 space-y-1 text-xs text-slate-600">
-                  {busq.venta?.productos.map((p) => (
+                  {busq.venta.productos.map((p) => (
                     <li key={p.sku} className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-slate-300" />{p.descripcion} <span className="font-mono text-slate-400">· {p.sku}</span></li>
                   ))}
                 </ul>
@@ -351,8 +363,8 @@ export default function SaleReturnWizard({ type, allowMultipleTypes, onChangeTyp
                   <img src={p.image} alt="" className="h-16 w-16 shrink-0 rounded-lg object-cover" />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium text-slate-900">{p.descripcion}</div>
-                    <div className="truncate font-mono text-[11px] text-slate-500">{p.sku} · {p.marca}</div>
-                    <div className="mt-0.5 text-xs text-slate-500">Talla {p.talla} · {p.color}</div>
+                    <div className="truncate font-mono text-[11px] text-slate-500">{p.sku} · {p.marca}{p.linea ? ` · ${p.linea}` : ''}</div>
+                    <div className="mt-0.5 text-xs text-slate-500">Talla {p.talla} · {p.color} · Lote {p.lote}</div>
                   </div>
                   {selSku === p.sku && <Check className="h-5 w-5 shrink-0 text-brand-600" />}
                 </button>
@@ -367,7 +379,11 @@ export default function SaleReturnWizard({ type, allowMultipleTypes, onChangeTyp
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700"><ShieldCheck className="h-4 w-4 text-slate-500" /> Información de la incidencia</div>
             <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
               <img src={selProd.image} alt="" className="h-14 w-14 rounded-lg object-cover" />
-              <div><div className="text-sm font-medium text-slate-900">{selProd.descripcion}</div><div className="font-mono text-xs text-slate-500">{selProd.sku}</div></div>
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-slate-900">{selProd.descripcion}</div>
+                <div className="font-mono text-xs text-slate-500">{selProd.sku} · {selProd.marca}{selProd.linea ? ` · ${selProd.linea}` : ''}</div>
+                <div className="mt-0.5 text-xs text-slate-500">Talla {selProd.talla} · {selProd.color} · Lote {selProd.lote}</div>
+              </div>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="block">
@@ -375,49 +391,7 @@ export default function SaleReturnWizard({ type, allowMultipleTypes, onChangeTyp
                 <input className={inputCls} placeholder="LT-…" value={lote} onChange={(e) => setLote(e.target.value)} />
                 <Hint>Ejemplo: LT-AD-1180</Hint>
               </label>
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">Gerente de la sucursal origen<span className="ml-0.5 text-brand-600">*</span></span>
-                <input className={inputCls} list="gerentes-venta" placeholder="Nombre del gerente" value={gerente} onChange={(e) => setGerente(e.target.value)} />
-                <datalist id="gerentes-venta">{GERENTES.map((g) => <option key={g} value={g} />)}</datalist>
-                <Hint>Ejemplo: Juan Carlos Rodríguez</Hint>
-              </label>
             </div>
-
-            {/* Autorización por SMS del supervisor */}
-            <div className={cn('rounded-xl border p-4', smsAuth ? 'border-emerald-200 bg-emerald-50/50' : 'border-brand-100 bg-brand-50/40')}>
-              <div className="flex items-center gap-2 text-sm font-medium text-slate-700"><MessageSquareLock className="h-4 w-4 text-brand-600" /> Autorización del supervisor (SMS)</div>
-              {smsAuth ? (
-                <div className="mt-2 flex items-center gap-2 text-sm text-emerald-700"><Check className="h-4 w-4" /> Autorizado por <span className="font-medium">{smsAuth.supervisor}</span>.</div>
-              ) : !smsSent ? (
-                <>
-                  <p className="mt-1 text-xs text-slate-600">Se enviará un código de 4 dígitos por SMS al supervisor autorizado de la sucursal. Vigencia 5 minutos · máximo 3 intentos.</p>
-                  <Button className="mt-3" size="sm" variant="secondary" icon={<MessageSquareLock className="h-4 w-4" />} onClick={enviarSMS}>Enviar código SMS</Button>
-                  {smsError && <p className="mt-2 text-xs font-medium text-rose-600">{smsError}</p>}
-                </>
-              ) : (
-                <>
-                  <div className="mt-1 flex items-center justify-between text-xs">
-                    <span className="text-slate-600">Ingresa el código enviado al supervisor.</span>
-                    <span className={cn('font-medium', smsLeft <= 30 ? 'text-brand-600' : 'text-slate-500')}>Vigencia {mmss(smsLeft)}</span>
-                  </div>
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      autoFocus inputMode="numeric" maxLength={4} value={smsCode}
-                      onChange={(e) => { setSmsCode(e.target.value.replace(/\D/g, '')); setSmsError('') }}
-                      onKeyDown={(e) => { if (e.key === 'Enter') verificarSMS() }}
-                      placeholder="••••"
-                      className="w-28 rounded-lg border border-slate-200 bg-white py-2 px-3 text-center font-mono text-lg tracking-[0.4em] focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                    />
-                    <Button size="sm" variant="primary" icon={<ShieldCheck className="h-4 w-4" />} disabled={smsCode.length !== 4} onClick={verificarSMS}>Validar</Button>
-                    <Button size="sm" variant="ghost" onClick={enviarSMS}>Reenviar</Button>
-                  </div>
-                  <Hint>Ejemplo: 4832 (código SMS de 4 dígitos del supervisor)</Hint>
-                  <p className="mt-2 text-[11px] text-slate-400">Demo: 4821 · 6238 · 3097 · 7410 · 5566</p>
-                  {smsError && <p className="mt-1 text-xs font-medium text-rose-600">{smsError}</p>}
-                </>
-              )}
-            </div>
-            <p className="text-xs text-slate-500">Sin la autorización del supervisor no es posible continuar.</p>
           </>
         )}
 
@@ -469,7 +443,44 @@ export default function SaleReturnWizard({ type, allowMultipleTypes, onChangeTyp
                 ))}
               </div>
             )}
-            {fotos === 0 && <p className="text-xs text-slate-500">Se requiere al menos una fotografía para generar el expediente.</p>}
+            {fotos === 0 && <p className="text-xs text-slate-500">Se requiere al menos una fotografía para solicitar la autorización del supervisor.</p>}
+
+            {/* Autorización por SMS del supervisor — solo con evidencia adjunta */}
+            <div className={cn('rounded-xl border p-4', smsAuth ? 'border-emerald-200 bg-emerald-50/50' : fotos >= 1 ? 'border-brand-100 bg-brand-50/40' : 'border-slate-200 bg-slate-50/60')}>
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-700"><MessageSquareLock className="h-4 w-4 text-brand-600" /> Autorización del supervisor (SMS)</div>
+              {smsAuth ? (
+                <div className="mt-2 flex items-center gap-2 text-sm text-emerald-700"><Check className="h-4 w-4" /> Autorizado por <span className="font-medium">{smsAuth.supervisor}</span>.</div>
+              ) : !smsSent ? (
+                <>
+                  <p className="mt-1 text-xs text-slate-600">El supervisor autoriza la devolución <span className="font-medium">con la evidencia ya adjunta</span>. Se enviará un código de 4 dígitos por SMS al supervisor autorizado de la sucursal. Vigencia 5 minutos · máximo 3 intentos.</p>
+                  <Button className="mt-3" size="sm" variant="secondary" icon={<MessageSquareLock className="h-4 w-4" />} disabled={fotos < 1} onClick={enviarSMS}>Solicitar autorización del supervisor</Button>
+                  {fotos < 1 && <p className="mt-2 text-[11px] text-slate-400">Adjunta al menos una fotografía para habilitar la solicitud.</p>}
+                  {smsError && <p className="mt-2 text-xs font-medium text-rose-600">{smsError}</p>}
+                </>
+              ) : (
+                <>
+                  <div className="mt-1 flex items-center justify-between text-xs">
+                    <span className="text-slate-600">Ingresa el código enviado al supervisor.</span>
+                    <span className={cn('font-medium', smsLeft <= 30 ? 'text-brand-600' : 'text-slate-500')}>Vigencia {mmss(smsLeft)}</span>
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      autoFocus inputMode="numeric" maxLength={4} value={smsCode}
+                      onChange={(e) => { setSmsCode(e.target.value.replace(/\D/g, '')); setSmsError('') }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') verificarSMS() }}
+                      placeholder="••••"
+                      className="w-28 rounded-lg border border-slate-200 bg-white py-2 px-3 text-center font-mono text-lg tracking-[0.4em] focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                    />
+                    <Button size="sm" variant="primary" icon={<ShieldCheck className="h-4 w-4" />} disabled={smsCode.length !== 4} onClick={verificarSMS}>Validar</Button>
+                    <Button size="sm" variant="ghost" onClick={enviarSMS}>Reenviar</Button>
+                  </div>
+                  <Hint>Ejemplo: 4832 (código SMS de 4 dígitos del supervisor)</Hint>
+                  <p className="mt-2 text-[11px] text-slate-400">Demo: 4821 · 6238 · 3097 · 7410 · 5566</p>
+                  {smsError && <p className="mt-1 text-xs font-medium text-rose-600">{smsError}</p>}
+                </>
+              )}
+            </div>
+            <p className="text-xs text-slate-500">No es posible generar el expediente sin evidencia ni sin la autorización exitosa del supervisor.</p>
           </>
         )}
 
