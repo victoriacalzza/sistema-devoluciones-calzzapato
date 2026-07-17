@@ -15,7 +15,6 @@ import {
   Plus,
   Trash2,
   ShieldCheck,
-  Info,
   Image as ImageIcon,
 } from 'lucide-react'
 import { PageHeader } from '../components/AppLayout'
@@ -34,6 +33,7 @@ import {
   type LoteInfo,
 } from '../data/mock'
 import { useRole } from '../lib/RoleContext'
+import SaleReturnWizard from './SaleReturnWizard'
 
 const TYPE_ICON: Record<ReturnTypeKey, typeof Store> = {
   cliente: Store,
@@ -154,6 +154,19 @@ export default function NewReturn() {
           })}
         </div>
       </div>
+    )
+  }
+
+  // Devolución de Cliente en Tienda y Devolución por Ecommerce usan el nuevo
+  // wizard de 4 pasos (identificar venta → producto → incidencia+SMS → evidencia).
+  if (type === 'cliente' || type === 'ecommerce') {
+    return (
+      <SaleReturnWizard
+        type={type}
+        allowMultipleTypes={allowed.length > 1}
+        onChangeType={() => setType(null)}
+        back={back}
+      />
     )
   }
 
@@ -549,34 +562,13 @@ export default function NewReturn() {
           </>
         )}
 
-        {/* NON-MASIVA / NON-DEPURACIÓN step 0: origin */}
+        {/* NON-MASIVA / NON-DEPURACIÓN step 0: origin (redistribución) */}
         {type !== 'masiva' && type !== 'depuracion' && step === 0 && (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            {type === 'cliente' && (
-              <>
-                <Field label="Factura" required><input className={inputCls} placeholder="FA-CUL-88231" /></Field>
-                <Field label="Cliente" required><input className={inputCls} placeholder="Nombre del cliente" /></Field>
-              </>
-            )}
-            {type === 'ecommerce' && (
-              <>
-                <Field label="ID de Venta" required>
-                  <input className={inputCls} placeholder="EC-99120" />
-                </Field>
-                <Field label="Cliente" required><input className={inputCls} placeholder="Nombre del cliente" /></Field>
-                <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
-                  El <span className="font-medium text-slate-700">ID de Venta</span> es obligatorio y funciona como el equivalente a la factura física utilizada en tienda. Al ser compra en línea no aplica "tienda origen"; se registra la <span className="font-medium text-slate-700">sucursal</span> que atiende la devolución.
-                </div>
-              </>
-            )}
-            {type === 'redistribucion' && (
-              <>
-                <Field label="Folio de traslado" required><input className={inputCls} placeholder="TR-44120" /></Field>
-                <Field label="Tienda origen" required>
-                  <select className={inputCls}>{SUCURSALES.map((s) => <option key={s}>{s}</option>)}</select>
-                </Field>
-              </>
-            )}
+            <Field label="Folio de traslado" required><input className={inputCls} placeholder="TR-44120" /></Field>
+            <Field label="Tienda origen" required>
+              <select className={inputCls}>{SUCURSALES.map((s) => <option key={s}>{s}</option>)}</select>
+            </Field>
             <Field label="Sucursal">
               <select className={inputCls}>{SUCURSALES.map((s) => <option key={s}>{s}</option>)}</select>
             </Field>
@@ -602,25 +594,12 @@ export default function NewReturn() {
             </div>
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <Field label="Cantidad">
-                {type === 'cliente' || type === 'ecommerce' ? (
-                  <input type="number" className={cn(inputCls, 'bg-slate-50 text-slate-500')} value={1} readOnly />
-                ) : (
-                  <input type="number" className={inputCls} defaultValue={1} min={1} />
-                )}
+                <input type="number" className={inputCls} defaultValue={1} min={1} />
               </Field>
               <Field label="Motivo" required>
                 <select className={inputCls}>{MOTIVOS.map((m) => <option key={m}>{m}</option>)}</select>
               </Field>
             </div>
-            {(type === 'cliente' || type === 'ecommerce') && (
-              <div className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-600">
-                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
-                <span>
-                  <span className="font-medium text-slate-700">1 artículo por devolución.</span> Si el mismo ticket tiene varios
-                  artículos, genera un expediente por artículo (un folio distinto para cada uno).
-                </span>
-              </div>
-            )}
             <Field label="Observaciones">
               <textarea rows={3} className={inputCls} placeholder="Describe el detalle del caso…" />
             </Field>

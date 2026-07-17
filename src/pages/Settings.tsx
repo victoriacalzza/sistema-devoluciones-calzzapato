@@ -5,8 +5,8 @@ import { PEOPLE } from '../data/mock'
 
 const ROLES = [
   { role: 'Tienda', perms: 'Registrar expedientes, adjuntar evidencias, dar seguimiento y responder solicitudes' },
-  { role: 'Ecommerce', perms: 'Registrar devoluciones del canal en línea, adjuntar evidencias y responder solicitudes' },
-  { role: 'Compras', perms: 'Revisar, autorizar/rechazar, gestionar masivas, devolver a proveedor y cerrar' },
+  { role: 'Ecommerce', perms: 'Registrar incidencias de redistribución, dar seguimiento a expedientes Ecommerce y consultar resoluciones' },
+  { role: 'Compras', perms: 'Revisar, autorizar/rechazar, definir resolución y almacén destino, gestionar masivas y dar seguimiento hasta la recepción' },
   { role: 'Administrador', perms: 'Subrol de Compras: usuarios, roles, permisos, SLA, motivos, resoluciones y catálogos maestros' },
 ]
 

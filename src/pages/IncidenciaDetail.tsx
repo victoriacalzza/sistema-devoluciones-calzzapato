@@ -285,7 +285,7 @@ export default function IncidenciaDetail() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-6" onClick={() => setResOpen(false)}>
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-pop" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2"><Gavel className="h-5 w-5 text-emerald-600" /><h3 className="text-base font-semibold text-slate-900">Registrar resolución</h3></div>
-            <p className="mt-1 text-sm text-slate-500">Describe la disposición de la mercancía (ej. merma, reetiquetado, devolución a proveedor).</p>
+            <p className="mt-1 text-sm text-slate-500">Describe la disposición de la mercancía (ej. merma, reetiquetado, reingreso a inventario).</p>
             <textarea
               autoFocus rows={3} value={resText} onChange={(e) => setResText(e.target.value)}
               placeholder="Resolución…"

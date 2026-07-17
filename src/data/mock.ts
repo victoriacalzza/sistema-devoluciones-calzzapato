@@ -34,7 +34,7 @@ export interface StatusMeta {
 export const STATUSES: Record<StatusKey, StatusMeta> = {
   nuevo: { key: 'nuevo', label: 'Nuevo', text: 'text-slate-700', bg: 'bg-slate-100', dot: 'bg-slate-400' },
   revision: { key: 'revision', label: 'En revisión', text: 'text-blue-700', bg: 'bg-blue-50', dot: 'bg-blue-500' },
-  esperando: { key: 'esperando', label: 'Esperando información', text: 'text-amber-700', bg: 'bg-amber-50', dot: 'bg-amber-500' },
+  esperando: { key: 'esperando', label: 'Pendiente de información de Tienda', text: 'text-amber-700', bg: 'bg-amber-50', dot: 'bg-amber-500' },
   autorizado: { key: 'autorizado', label: 'Autorizado', text: 'text-emerald-700', bg: 'bg-emerald-50', dot: 'bg-emerald-500' },
   rechazado: { key: 'rechazado', label: 'Rechazado', text: 'text-rose-700', bg: 'bg-rose-50', dot: 'bg-rose-500' },
   pendiente_traslado: { key: 'pendiente_traslado', label: 'Pendiente de traslado', text: 'text-violet-700', bg: 'bg-violet-50', dot: 'bg-violet-500' },
@@ -1642,6 +1642,76 @@ export function buscarTraslado(q: { idVenta?: string; idTraslado?: string; folio
   if (found) return found
   if (anyInput) return TRASLADOS[0]
   return undefined
+}
+
+// ------------------- Ventas / facturas (wizard Tienda) ---------------------
+// Cliente en Tienda: se busca por factura. Ecommerce: se busca por ID de venta.
+// El sistema trae los productos de la venta y valida que no exista una
+// devolución activa asociada (regla: una devolución activa por factura/venta).
+
+export interface Venta {
+  folio: string
+  tipo: 'cliente' | 'ecommerce'
+  cliente: string
+  sucursal: string
+  fecha: string
+  productos: TrasladoProducto[]
+}
+
+const VENTAS: Venta[] = [
+  {
+    folio: 'FA-CUL-88231', tipo: 'cliente', cliente: 'Laura Sánchez Medina', sucursal: 'Culiacán Centro', fecha: '28 jun 2026',
+    productos: [
+      { sku: 'NK-AJ1-2291', descripcion: 'Tenis Nike Air Jordan 1 Mid — Negro/Rojo', marca: 'Nike', proveedor: 'Nike México', lote: 'LT-NK-2291', talla: '27 MX', color: 'Negro / Rojo', image: IMG.sneakerRed },
+      { sku: 'NK-CALC-01', descripcion: 'Calcetas Nike Everyday (3 pares)', marca: 'Nike', proveedor: 'Nike México', lote: 'LT-NK-CALC', talla: 'Única', color: 'Blanco', image: IMG.boxShoes },
+    ],
+  },
+  {
+    folio: 'FA-FOR-77120', tipo: 'cliente', cliente: 'Patricia Vega', sucursal: 'Culiacán Forum', fecha: '15 jun 2026',
+    productos: [
+      { sku: 'AN-ZP-5510', descripcion: 'Zapatilla Andrea tacón medio — Nude', marca: 'Andrea', proveedor: 'Grupo Andrea', lote: 'LT-AN-5510', talla: '24 MX', color: 'Nude', image: IMG.heels },
+    ],
+  },
+  {
+    folio: 'EC-99120', tipo: 'ecommerce', cliente: 'Roberto Gil', sucursal: 'Guadalajara Andares', fecha: '22 jun 2026',
+    productos: [
+      { sku: 'AD-UB-1180', descripcion: 'Tenis Adidas Ultraboost Light — Blanco', marca: 'Adidas', proveedor: 'Adidas México', lote: 'LT-AD-1180', talla: '28 MX', color: 'Blanco', image: IMG.sneakerWhite },
+    ],
+  },
+  {
+    folio: 'EC-98004', tipo: 'ecommerce', cliente: 'Sofía Torres', sucursal: 'Guasave Centro', fecha: '20 jun 2026',
+    productos: [
+      { sku: 'CH-BG-1200', descripcion: 'Bolsa Coach Willow — Café', marca: 'Coach', proveedor: 'VF Corp', lote: 'LT-CH-1200', talla: 'Única', color: 'Café', image: IMG.bag },
+    ],
+  },
+]
+
+// Folios con una devolución activa (para validar la regla de no duplicar).
+const DEVOLUCIONES_ACTIVAS = ['FA-FOR-77120', 'EC-98004']
+
+const VENTA_DEFAULT_PRODUCTOS: TrasladoProducto[] = [
+  { sku: 'NK-AJ1-2291', descripcion: 'Tenis Nike Air Jordan 1 Mid — Negro/Rojo', marca: 'Nike', proveedor: 'Nike México', lote: 'LT-NK-2291', talla: '27 MX', color: 'Negro / Rojo', image: IMG.sneakerRed },
+  { sku: 'SK-GW-4410', descripcion: 'Skechers Go Walk — Azul marino', marca: 'Skechers', proveedor: 'VF Corp', lote: 'LT-SK-4410', talla: '27 MX', color: 'Azul marino', image: IMG.sneakerWhite },
+]
+
+export interface BusquedaVenta {
+  venta?: Venta
+  existe: boolean
+  devolucionActiva: boolean
+}
+
+/** Busca una venta por factura (cliente) o ID de venta (ecommerce). */
+export function buscarVenta(tipo: 'cliente' | 'ecommerce', folio: string): BusquedaVenta {
+  const q = folio.trim()
+  if (!q) return { existe: false, devolucionActiva: false }
+  const found = VENTAS.find((v) => v.tipo === tipo && v.folio.toLowerCase() === q.toLowerCase())
+  const devolucionActiva = DEVOLUCIONES_ACTIVAS.some((f) => f.toLowerCase() === q.toLowerCase())
+  // Prototipo: cualquier folio no vacío "existe"; si no está en el catálogo se
+  // devuelve una venta genérica para poder continuar el flujo.
+  const venta: Venta = found ?? {
+    folio: q, tipo, cliente: '—', sucursal: SUCURSALES[0], fecha: '—', productos: VENTA_DEFAULT_PRODUCTOS,
+  }
+  return { venta, existe: true, devolucionActiva }
 }
 
 /** Motivos sugeridos en el wizard de incidencia (paso Registrar incidencia detectada). */

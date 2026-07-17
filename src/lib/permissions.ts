@@ -17,7 +17,7 @@ export type ActionKey =
   | 'rechazar'
   | 'solicitar_info'
   | 'responder_info'
-  | 'generar_traslado'
+  | 'enviar_almacen'
   | 'cerrar'
   | 'imprimir'
   | 'comentar'
@@ -31,7 +31,7 @@ const ACTION_ROLES: Record<ActionKey, RoleKey[]> = {
   autorizar: ['compras'],
   rechazar: ['compras'],
   solicitar_info: ['compras'],
-  generar_traslado: ['compras'], // devolución a proveedor
+  enviar_almacen: ['compras'], // enviar mercancía al almacén destino
   cerrar: ['compras'],
   imprimir: ['tienda', 'ecommerce', 'compras'],
   comentar: ['tienda', 'ecommerce', 'compras'],
@@ -42,9 +42,9 @@ const STATUS_ACTIONS: Record<StatusKey, ActionKey[]> = {
   nuevo: ['tomar', 'solicitar_info', 'comentar', 'imprimir'],
   revision: ['autorizar', 'rechazar', 'solicitar_info', 'comentar', 'imprimir'],
   esperando: ['responder_info', 'solicitar_info', 'comentar', 'imprimir'],
-  autorizado: ['generar_traslado', 'comentar', 'imprimir'],
+  autorizado: ['enviar_almacen', 'comentar', 'imprimir'],
   rechazado: ['comentar', 'imprimir'],
-  pendiente_traslado: ['generar_traslado', 'comentar', 'imprimir'],
+  pendiente_traslado: ['enviar_almacen', 'comentar', 'imprimir'],
   transito: ['comentar', 'imprimir'],
   recibido: ['comentar', 'imprimir'],
   cerrado: ['imprimir'],
@@ -131,12 +131,12 @@ export function ownershipFor(status: StatusKey): Ownership {
     nuevo: { area: 'Tienda', nextAction: 'Registrar y enviar a revisión', areaColor: 'bg-slate-100 text-slate-700' },
     revision: { area: 'Compras', nextAction: 'Autorizar o rechazar', areaColor: 'bg-emerald-50 text-emerald-700' },
     esperando: { area: 'Tienda', nextAction: 'Responder solicitud de información', areaColor: 'bg-amber-50 text-amber-700' },
-    autorizado: { area: 'Compras', nextAction: 'Generar devolución a proveedor', areaColor: 'bg-violet-50 text-violet-700' },
+    autorizado: { area: 'Compras', nextAction: 'Pendiente de envío a almacén destino', areaColor: 'bg-violet-50 text-violet-700' },
     rechazado: { area: '—', nextAction: 'Expediente rechazado', areaColor: 'bg-rose-50 text-rose-700' },
-    pendiente_traslado: { area: 'Compras', nextAction: 'Generar devolución a proveedor', areaColor: 'bg-violet-50 text-violet-700' },
-    transito: { area: '—', nextAction: 'En tránsito a proveedor', areaColor: 'bg-indigo-50 text-indigo-700' },
-    recibido: { area: '—', nextAction: 'Recepción confirmada', areaColor: 'bg-teal-50 text-teal-700' },
-    cerrado: { area: '—', nextAction: 'Expediente cerrado', areaColor: 'bg-slate-100 text-slate-500' },
+    pendiente_traslado: { area: 'Compras', nextAction: 'Pendiente de envío a almacén destino', areaColor: 'bg-violet-50 text-violet-700' },
+    transito: { area: 'Compras', nextAction: 'En tránsito hacia almacén', areaColor: 'bg-indigo-50 text-indigo-700' },
+    recibido: { area: 'Compras', nextAction: 'Recibido en almacén', areaColor: 'bg-teal-50 text-teal-700' },
+    cerrado: { area: '—', nextAction: 'Expediente concluido', areaColor: 'bg-slate-100 text-slate-500' },
   }
   return map[status]
 }

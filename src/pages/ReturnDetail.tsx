@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import {
   Check,
@@ -101,7 +101,7 @@ const ACTION_META: Partial<Record<ActionKey, BarBtn>> = {
   tomar: { label: 'Registrar y enviar a revisión', icon: <Hand className="h-4 w-4" />, variant: 'primary' },
   responder_info: { label: 'Responder información', icon: <MessageSquarePlus className="h-4 w-4" />, variant: 'primary' },
   solicitar_info: { label: 'Solicitar información', icon: <MessageSquarePlus className="h-4 w-4" />, variant: 'secondary' },
-  generar_traslado: { label: 'Generar devolución a proveedor', icon: <Truck className="h-4 w-4" />, variant: 'secondary' },
+  enviar_almacen: { label: 'Enviar a almacén destino', icon: <Truck className="h-4 w-4" />, variant: 'secondary' },
   cerrar: { label: 'Cerrar expediente', icon: <Check className="h-4 w-4" />, variant: 'primary' },
   rechazar: { label: 'Rechazar', icon: <X className="h-4 w-4" />, variant: 'danger' },
   autorizar: { label: 'Autorizar', icon: <Check className="h-4 w-4" />, variant: 'success' },
@@ -113,7 +113,7 @@ const ACTION_ORDER: ActionKey[] = [
   'tomar',
   'responder_info',
   'solicitar_info',
-  'generar_traslado',
+  'enviar_almacen',
   'cerrar',
   'rechazar',
   'autorizar',
@@ -129,6 +129,9 @@ export default function ReturnDetail() {
   const auth = (location.state as { auth?: { supervisor: string; sucursal: string; fecha: string; hora: string } } | null)?.auth
   const [comments, setComments] = useState<Comment[]>(data?.comments ?? [])
   const [draft, setDraft] = useState('')
+  // Chat: para desplazar y enfocar al iniciar "Solicitar información".
+  const chatRef = useRef<HTMLDivElement>(null)
+  const chatInputRef = useRef<HTMLTextAreaElement>(null)
   const [preview, setPreview] = useState<Evidence | null>(null)
   const [resolucion, setResolucion] = useState<string>(data?.resolucion ? RESOLUTIONS[data.resolucion] : '')
   const [almacen, setAlmacen] = useState<string>(data?.almacen ?? '')
@@ -205,7 +208,14 @@ export default function ReturnDetail() {
         setRejectOpen(true)
         break
       case 'solicitar_info':
-        transition('esperando', 'solicitó más información', 'info', 'Se solicitó información a la sucursal')
+        // Inicia el flujo de comunicación: pasa a "Pendiente de información de
+        // Tienda" (ownership → Tienda) y lleva al chat con el cursor listo.
+        setStatus('esperando')
+        setBanner({ kind: 'info', text: 'Redacta la solicitud a la tienda y envíala; el caso quedará en su bandeja "Requieren mi acción".' })
+        setTimeout(() => {
+          chatRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          chatInputRef.current?.focus()
+        }, 60)
         break
       case 'responder_info':
         transition('revision', 'respondió a la solicitud de información', 'info', 'Información enviada a Compras')
@@ -213,8 +223,8 @@ export default function ReturnDetail() {
       case 'tomar':
         transition('revision', 'registró y envió a revisión', 'info', 'Expediente enviado a revisión de Compras')
         break
-      case 'generar_traslado':
-        transition('transito', 'generó la devolución a proveedor', 'info', 'Devolución a proveedor generada')
+      case 'enviar_almacen':
+        transition('transito', 'envió la mercancía al almacén destino', 'info', 'Mercancía enviada al almacén destino')
         break
       case 'imprimir':
         setBanner({ kind: 'info', text: 'Enviando expediente a impresión…' })
@@ -250,10 +260,18 @@ export default function ReturnDetail() {
 
   function send() {
     if (!draft.trim()) return
+    const text = draft.trim()
     setComments((c) => [
       ...c,
-      { id: `c${c.length + 1}`, authorId: user.id, time: 'ahora', text: draft.trim() },
+      { id: `c${c.length + 1}`, authorId: user.id, time: 'ahora', text },
     ])
+    // La solicitud de Compras (caso en "Pendiente de información de Tienda")
+    // queda registrada en el historial y notifica a la sucursal.
+    const esSolicitud = role === 'compras' && status === 'esperando'
+    logEvent(esSolicitud ? 'solicitó información a la sucursal' : 'agregó un comentario', 'comment')
+    if (esSolicitud) {
+      setBanner({ kind: 'success', text: 'Solicitud enviada · se notificó a la tienda (aparece en su bandeja "Requieren mi acción").' })
+    }
     setDraft('')
   }
 
@@ -460,7 +478,7 @@ export default function ReturnDetail() {
 
             {/* Comments — internal chat */}
             <Card padded={false}>
-              <div className="px-5 pt-5">
+              <div ref={chatRef} className="scroll-mt-24 px-5 pt-5">
                 <SectionTitle icon={<MessagesSquare className="h-4 w-4" />}>Comentarios internos</SectionTitle>
               </div>
               <div className="max-h-[420px] space-y-4 overflow-y-auto px-5 pb-4">
@@ -502,6 +520,7 @@ export default function ReturnDetail() {
                   <div className="flex items-end gap-2 rounded-xl border border-slate-200 bg-white p-2 focus-within:border-brand-300 focus-within:ring-2 focus-within:ring-brand-100">
                     <button title="Adjuntar foto, video o documento" aria-label="Adjuntar foto, video o documento" className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"><Paperclip className="h-4 w-4" /></button>
                     <textarea
+                      ref={chatInputRef}
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
