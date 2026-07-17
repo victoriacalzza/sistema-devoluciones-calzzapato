@@ -23,6 +23,7 @@ import {
   buscarVenta,
   supervisorByCode,
   SUCURSALES,
+  MOTIVOS,
   RETURN_TYPES,
   type BusquedaVenta,
   type TrasladoProducto,
@@ -105,8 +106,10 @@ export default function SaleReturnWizard({ type, allowMultipleTypes, onChangeTyp
   // Paso 2 — producto
   const [selSku, setSelSku] = useState('')
 
-  // Paso 3 — incidencia + SMS supervisor
-  const [lote, setLote] = useState('')
+  // Paso 3 — información de la incidencia (problema del producto)
+  const [motivo, setMotivo] = useState('')
+  const [descripcion, setDescripcion] = useState('')
+  // Paso 4 — SMS supervisor
   const [smsSent, setSmsSent] = useState(false)
   const [smsCode, setSmsCode] = useState('')
   const [smsLeft, setSmsLeft] = useState(0)
@@ -218,14 +221,14 @@ export default function SaleReturnWizard({ type, allowMultipleTypes, onChangeTyp
   const stepValid: Record<number, boolean> = {
     1: !!busq?.existe && !busq?.devolucionActiva && !!cliente.trim() && !!sucursal,
     2: !!selSku,
-    3: !!lote.trim(),
+    3: !!motivo,
     4: fotos >= 1 && !uploading && !!smsAuth,
   }
 
   function resetAll() {
     files.forEach((f) => URL.revokeObjectURL(f.url))
     setStep(1); setDone(false); setFolio(''); setCliente(''); setSucursal(''); setBusq(null); setBuscado(false)
-    setSelSku(''); setLote(''); setSmsSent(false); setSmsCode(''); setSmsLeft(0); setSmsIntentos(0); setSmsError(''); setSmsAuth(null)
+    setSelSku(''); setMotivo(''); setDescripcion(''); setSmsSent(false); setSmsCode(''); setSmsLeft(0); setSmsIntentos(0); setSmsError(''); setSmsAuth(null)
     setFiles([]); setFileErrors([])
   }
 
@@ -246,6 +249,7 @@ export default function SaleReturnWizard({ type, allowMultipleTypes, onChangeTyp
               <div><span className="text-slate-500">{folioLabel}:</span> <span className="font-mono font-medium text-slate-800">{folio}</span></div>
               <div><span className="text-slate-500">Cliente:</span> <span className="font-medium text-slate-800">{cliente}</span></div>
               <div className="sm:col-span-2"><span className="text-slate-500">Producto:</span> <span className="font-medium text-slate-800">{selProd?.descripcion}</span></div>
+              <div><span className="text-slate-500">Motivo:</span> <span className="font-medium text-slate-800">{motivo}</span></div>
               <div><span className="text-slate-500">Sucursal:</span> <span className="font-medium text-slate-800">{sucursal}</span></div>
               <div><span className="text-slate-500">Autorizó:</span> <span className="font-medium text-slate-800">{smsAuth?.supervisor}</span></div>
               <div className="sm:col-span-2"><span className="text-slate-500">Evidencia:</span> <span className="font-medium text-slate-800">{fotos} fotografía(s){videos > 0 ? ` y ${videos} video(s)` : ''}</span></div>
@@ -357,7 +361,7 @@ export default function SaleReturnWizard({ type, allowMultipleTypes, onChangeTyp
               {venta.productos.map((p) => (
                 <button
                   key={p.sku}
-                  onClick={() => { setSelSku(p.sku); setLote(p.lote) }}
+                  onClick={() => setSelSku(p.sku)}
                   className={cn('flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors', selSku === p.sku ? 'border-brand-300 bg-brand-50' : 'border-slate-200 hover:bg-slate-50')}
                 >
                   <img src={p.image} alt="" className="h-16 w-16 shrink-0 rounded-lg object-cover" />
@@ -373,25 +377,47 @@ export default function SaleReturnWizard({ type, allowMultipleTypes, onChangeTyp
           </>
         )}
 
-        {/* PASO 3 — Información de la incidencia + SMS supervisor */}
-        {step === 3 && selProd && (
+        {/* PASO 3 — Información de la incidencia (problema del producto) */}
+        {step === 3 && selProd && venta && (
           <>
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-700"><ShieldCheck className="h-4 w-4 text-slate-500" /> Información de la incidencia</div>
-            <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
-              <img src={selProd.image} alt="" className="h-14 w-14 rounded-lg object-cover" />
-              <div className="min-w-0">
-                <div className="text-sm font-medium text-slate-900">{selProd.descripcion}</div>
-                <div className="font-mono text-xs text-slate-500">{selProd.sku} · {selProd.marca}{selProd.linea ? ` · ${selProd.linea}` : ''}</div>
-                <div className="mt-0.5 text-xs text-slate-500">Talla {selProd.talla} · {selProd.color} · Lote {selProd.lote}</div>
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-700"><Package className="h-4 w-4 text-slate-500" /> Producto seleccionado</div>
+            {/* Ficha del producto — toda la información se obtiene automáticamente
+                de la factura / ID Venta; es de solo lectura, sin captura manual. */}
+            <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+              <div className="flex items-center gap-3">
+                <img src={selProd.image} alt="" className="h-16 w-16 shrink-0 rounded-lg object-cover" />
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-slate-900">{selProd.descripcion}</div>
+                  <div className="text-[11px] text-slate-400">Datos obtenidos automáticamente · solo lectura</div>
+                </div>
               </div>
+              <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 border-t border-slate-100 pt-3 text-xs sm:grid-cols-2">
+                <div className="flex justify-between gap-2"><dt className="text-slate-500">SKU</dt><dd className="font-mono font-medium text-slate-700">{selProd.sku}</dd></div>
+                <div className="flex justify-between gap-2"><dt className="text-slate-500">Marca</dt><dd className="font-medium text-slate-700">{selProd.marca}</dd></div>
+                <div className="flex justify-between gap-2"><dt className="text-slate-500">Agrupación de línea</dt><dd className="font-medium text-slate-700">{selProd.linea ?? '—'}</dd></div>
+                <div className="flex justify-between gap-2"><dt className="text-slate-500">Talla</dt><dd className="font-medium text-slate-700">{selProd.talla}</dd></div>
+                <div className="flex justify-between gap-2"><dt className="text-slate-500">Color</dt><dd className="font-medium text-slate-700">{selProd.color}</dd></div>
+                <div className="flex justify-between gap-2"><dt className="text-slate-500">Lote</dt><dd className="font-mono font-medium text-slate-700">{selProd.lote}</dd></div>
+                <div className="flex justify-between gap-2"><dt className="text-slate-500">Fecha de compra</dt><dd className="font-medium text-slate-700">{venta.fecha}</dd></div>
+                {!isEcom && venta.sucursalCompra && (
+                  <div className="flex justify-between gap-2"><dt className="text-slate-500">Sucursal de compra</dt><dd className="font-medium text-slate-700">{venta.sucursalCompra}</dd></div>
+                )}
+              </dl>
             </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">Lote<span className="ml-0.5 text-brand-600">*</span></span>
-                <input className={inputCls} placeholder="LT-…" value={lote} onChange={(e) => setLote(e.target.value)} />
-                <Hint>Ejemplo: LT-AD-1180</Hint>
-              </label>
-            </div>
+
+            <div className="flex items-center gap-2 pt-1 text-sm font-medium text-slate-700"><ShieldCheck className="h-4 w-4 text-slate-500" /> Información de la incidencia</div>
+            <p className="text-sm text-slate-500">Tienda solo registra el caso. La resolución del producto la define Compras tras su revisión.</p>
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-slate-700">Motivo de devolución<span className="ml-0.5 text-brand-600">*</span></span>
+              <select className={cn(inputCls, 'sm:max-w-md')} value={motivo} onChange={(e) => setMotivo(e.target.value)}>
+                <option value="">Selecciona un motivo…</option>
+                {MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-slate-700">Descripción del problema <span className="text-slate-400">(opcional)</span></span>
+              <textarea rows={3} className={inputCls} placeholder="Agrega contexto adicional del problema si lo consideras necesario…" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
+            </label>
           </>
         )}
 
