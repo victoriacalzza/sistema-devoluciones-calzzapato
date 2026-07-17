@@ -4,7 +4,6 @@ import {
   Check,
   X,
   MessageSquarePlus,
-  Truck,
   Printer,
   Paperclip,
   Image as ImageIcon,
@@ -101,7 +100,6 @@ const ACTION_META: Partial<Record<ActionKey, BarBtn>> = {
   tomar: { label: 'Registrar y enviar a revisión', icon: <Hand className="h-4 w-4" />, variant: 'primary' },
   responder_info: { label: 'Responder información', icon: <MessageSquarePlus className="h-4 w-4" />, variant: 'primary' },
   solicitar_info: { label: 'Solicitar información', icon: <MessageSquarePlus className="h-4 w-4" />, variant: 'secondary' },
-  enviar_almacen: { label: 'Enviar a almacén destino', icon: <Truck className="h-4 w-4" />, variant: 'secondary' },
   cerrar: { label: 'Cerrar expediente', icon: <Check className="h-4 w-4" />, variant: 'primary' },
   rechazar: { label: 'Rechazar', icon: <X className="h-4 w-4" />, variant: 'danger' },
   autorizar: { label: 'Autorizar', icon: <Check className="h-4 w-4" />, variant: 'success' },
@@ -113,7 +111,6 @@ const ACTION_ORDER: ActionKey[] = [
   'tomar',
   'responder_info',
   'solicitar_info',
-  'enviar_almacen',
   'cerrar',
   'rechazar',
   'autorizar',
@@ -223,9 +220,6 @@ export default function ReturnDetail() {
       case 'tomar':
         transition('revision', 'registró y envió a revisión', 'info', 'Expediente enviado a revisión de Compras')
         break
-      case 'enviar_almacen':
-        transition('transito', 'envió la mercancía al almacén destino', 'info', 'Mercancía enviada al almacén destino')
-        break
       case 'imprimir':
         setBanner({ kind: 'info', text: 'Enviando expediente a impresión…' })
         break
@@ -248,7 +242,9 @@ export default function ReturnDetail() {
     if (data.tipo === 'cliente') {
       transition('cerrado', `autorizó y resolvió — ${wizRes.label} · destino ${wizAlmacen}`, 'success', `Devolución autorizada y resuelta · ${wizRes.label} → ${wizAlmacen}`)
     } else {
-      transition('autorizado', `autorizó la devolución — ${wizRes.label} · destino ${wizAlmacen}`, 'success', `Devolución autorizada · ${wizRes.label} → ${wizAlmacen}`)
+      // Al autorizar, el sistema registra el destino y genera el envío automáticamente:
+      // el expediente pasa directo a "En tránsito al almacén destino" sin acción extra.
+      transition('transito', `autorizó la devolución — ${wizRes.label} · destino ${wizAlmacen}; el sistema generó el envío al almacén destino`, 'success', `Devolución autorizada · envío generado automáticamente a ${wizAlmacen}`)
     }
   }
 
@@ -598,7 +594,7 @@ export default function ReturnDetail() {
               <SectionTitle icon={<Boxes className="h-4 w-4" />} right={<span className="font-mono text-xs text-slate-500">{data.lote}</span>}>
                 Existencias
               </SectionTitle>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <div className="rounded-lg border border-slate-100 px-3 py-2">
                   <div className="text-[11px] text-slate-500">Total</div>
                   <div className="text-lg font-semibold text-slate-900">{existencias.total}</div>
@@ -610,10 +606,6 @@ export default function ReturnDetail() {
                 <div className="rounded-lg border border-slate-100 px-3 py-2">
                   <div className="text-[11px] text-slate-500">En tránsito</div>
                   <div className="text-lg font-semibold text-indigo-600">{existencias.transito}</div>
-                </div>
-                <div className="rounded-lg border border-slate-100 px-3 py-2">
-                  <div className="text-[11px] text-slate-500">Comprometida</div>
-                  <div className="text-lg font-semibold text-amber-600">{existencias.comprometida}</div>
                 </div>
               </div>
               <div className="mt-3 overflow-hidden rounded-xl border border-slate-100">

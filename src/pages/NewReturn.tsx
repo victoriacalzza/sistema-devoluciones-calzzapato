@@ -316,11 +316,10 @@ export default function NewReturn() {
                 {/* Resumen de existencias */}
                 <div>
                   <div className="mb-2 text-sm font-medium text-slate-700">Resumen de existencias</div>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="grid grid-cols-3 gap-2">
                     <div className="rounded-lg border border-slate-100 px-3 py-2"><div className="text-[11px] text-slate-500">Total</div><div className="text-lg font-semibold text-slate-900">{mLoteInfo.existencias.total}</div></div>
                     <div className="rounded-lg border border-slate-100 px-3 py-2"><div className="text-[11px] text-slate-500">Disponible</div><div className="text-lg font-semibold text-emerald-600">{mLoteInfo.existencias.disponible}</div></div>
                     <div className="rounded-lg border border-slate-100 px-3 py-2"><div className="text-[11px] text-slate-500">En tránsito</div><div className="text-lg font-semibold text-indigo-600">{mLoteInfo.existencias.transito}</div></div>
-                    <div className="rounded-lg border border-slate-100 px-3 py-2"><div className="text-[11px] text-slate-500">Comprometida</div><div className="text-lg font-semibold text-amber-600">{mLoteInfo.existencias.comprometida}</div></div>
                   </div>
                 </div>
 

@@ -55,8 +55,13 @@ import {
   ECOMMERCE_KPIS,
   INCIDENCIA_STATUS,
   devolucionesPendientesResolucion,
+  solicitudesMasivasTienda,
+  solicitudMasivaActiva,
+  massTiendaNextAction,
+  MASS_TIENDA_STATUS,
   type ReturnCase,
   type Incidencia,
+  type SolicitudMasivaTienda,
 } from '../data/mock'
 import { useRole } from '../lib/RoleContext'
 
@@ -374,6 +379,10 @@ function OperationalPortal() {
   const enTransito = mine.filter((r) => r.status === 'transito' || r.status === 'recibido')
   const rechazadas = mine.filter((r) => r.status === 'rechazado')
 
+  // Devoluciones masivas solicitadas por Compras a esta sucursal (Tienda solo atiende).
+  const solicitudesMasivas = solicitudesMasivasTienda(sucursal)
+  const masivasActivas = solicitudesMasivas.filter((s) => solicitudMasivaActiva(s.status))
+
   return (
     <div className="mx-auto max-w-[960px] px-4 py-8 lg:px-6">
       <div className="mb-6">
@@ -388,6 +397,12 @@ function OperationalPortal() {
         <ActionCard title="Pendientes de información" desc="Compras te pidió datos" icon={<MessageSquareReply className="h-6 w-6" />} badge={infoPend.length} onClick={() => navigate('/devoluciones?status=esperando')} />
         <ActionCard title="Casos en tránsito" desc="Mercancía hacia CEDIS" icon={<Truck className="h-6 w-6" />} badge={enTransito.length} onClick={() => navigate('/devoluciones?status=transito')} />
         <ActionCard title="Casos rechazados" desc="Devoluciones no procedentes" icon={<XCircle className="h-6 w-6" />} badge={rechazadas.length} onClick={() => navigate('/devoluciones?status=rechazado')} />
+        <ActionCard title="Devoluciones masivas pendientes" desc="Compras solicitó retirar mercancía de esta sucursal" icon={<Layers className="h-6 w-6" />} badge={masivasActivas.length} onClick={() => navigate('/masivas-tienda')} />
+      </div>
+
+      {/* Bandeja de devoluciones masivas asignadas a la sucursal */}
+      <div className="mt-8">
+        <MassTiendaBandeja solicitudes={solicitudesMasivas} sucursal={sucursal} />
       </div>
 
       {/* Lo que ha pasado en tus expedientes */}
@@ -395,6 +410,68 @@ function OperationalPortal() {
         <RecentActivity cases={mine} />
       </div>
     </div>
+  )
+}
+
+/** Bandeja de devoluciones masivas solicitadas por Compras a la sucursal (Tienda). */
+function MassTiendaBandeja({ solicitudes, sucursal }: { solicitudes: SolicitudMasivaTienda[]; sucursal: string }) {
+  const navigate = useNavigate()
+  const activas = solicitudes.filter((s) => solicitudMasivaActiva(s.status))
+  return (
+    <Card padded={false}>
+      <div className="flex items-center justify-between gap-3 px-5 py-4">
+        <div className="flex items-center gap-2">
+          <span className="text-slate-500"><Layers className="h-4 w-4" /></span>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">Devoluciones masivas pendientes</h3>
+            <p className="text-xs text-slate-500">Solicitudes de Compras que requieren retirar mercancía de esta sucursal.</p>
+          </div>
+          <span className="ml-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-brand-600 px-2 text-xs font-semibold text-white">{activas.length}</span>
+        </div>
+      </div>
+      <div className="divide-y divide-slate-50 border-t border-slate-100">
+        {solicitudes.map(({ mass, sub, status }) => {
+          const st = MASS_TIENDA_STATUS[status]
+          return (
+            <button
+              key={mass.folio}
+              onClick={() => navigate(`/masivas-tienda/${mass.folio}`)}
+              className="flex w-full items-center gap-4 px-5 py-3 text-left hover:bg-slate-50"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-xs font-semibold text-slate-900">{mass.folio}</span>
+                  <span className="text-xs text-slate-500">Lote {mass.lote}</span>
+                  <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">{mass.marca}</span>
+                </div>
+                <p className="mt-0.5 truncate text-sm text-slate-600">{mass.producto}</p>
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-500">
+                  <span className="font-mono">{mass.sku}</span>
+                  <span>·</span>
+                  <span>Solicitado: <span className="font-semibold text-slate-700">{sub.solicitado} uds.</span></span>
+                  <span>·</span>
+                  <span>Comprador: {mass.responsable}</span>
+                  <span>·</span>
+                  <span>Límite: {sub.fechaCompromiso}</span>
+                </div>
+              </div>
+              <div className="hidden shrink-0 text-right sm:block">
+                <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium', st.bg, st.text)}>
+                  <span className={cn('h-1.5 w-1.5 rounded-full', st.dot)} />{st.label}
+                </span>
+                <div className="mt-1 text-[11px] text-slate-500">{massTiendaNextAction(status)}</div>
+              </div>
+              <ArrowRight className="hidden h-4 w-4 shrink-0 text-slate-300 sm:block" />
+            </button>
+          )
+        })}
+        {solicitudes.length === 0 && (
+          <div className="px-5 py-12 text-center text-sm text-slate-500">
+            No hay devoluciones masivas asignadas a {sucursal || 'tu sucursal'}.
+          </div>
+        )}
+      </div>
+    </Card>
   )
 }
 

@@ -410,13 +410,12 @@ export interface Existencias {
   total: number
   disponible: number
   transito: number
-  comprometida: number
   porSucursal: ExistenciaSucursal[]
 }
 
 const EXISTENCIAS_BY_LOTE: Record<string, Existencias> = {
   'LT-NK-2291': {
-    total: 28, disponible: 19, transito: 6, comprometida: 3,
+    total: 28, disponible: 19, transito: 6,
     porSucursal: [
       { sucursal: 'Culiacán Centro', cantidad: 12 },
       { sucursal: 'Culiacán Forum', cantidad: 8 },
@@ -425,7 +424,7 @@ const EXISTENCIAS_BY_LOTE: Record<string, Existencias> = {
     ],
   },
   'LT-AD-1180': {
-    total: 21, disponible: 16, transito: 3, comprometida: 2,
+    total: 21, disponible: 16, transito: 3,
     porSucursal: [
       { sucursal: 'Culiacán Centro', cantidad: 9 },
       { sucursal: 'Guadalajara Andares', cantidad: 7 },
@@ -435,7 +434,7 @@ const EXISTENCIAS_BY_LOTE: Record<string, Existencias> = {
 }
 
 const EXISTENCIAS_DEFAULT: Existencias = {
-  total: 14, disponible: 9, transito: 3, comprometida: 2,
+  total: 14, disponible: 9, transito: 3,
   porSucursal: [
     { sucursal: 'Culiacán Centro', cantidad: 6 },
     { sucursal: 'Mazatlán Marina', cantidad: 4 },
@@ -443,7 +442,7 @@ const EXISTENCIAS_DEFAULT: Existencias = {
   ],
 }
 
-/** Existencias del producto/lote — total, disponible, tránsito, comprometida y por sucursal. */
+/** Existencias del producto/lote — total, disponible, tránsito y por sucursal. */
 export function existenciasFor(lote: string): Existencias {
   return EXISTENCIAS_BY_LOTE[lote] ?? EXISTENCIAS_DEFAULT
 }
@@ -1029,18 +1028,83 @@ export interface MassSub {
   status: StatusKey
   evidencias: Evidence[]
   historial: TimelineEvent[]
+  // Seguimiento del lado de Tienda (atención de la solicitud en la sucursal).
+  // Compras define solicitado/lote/almacén; Tienda solo localiza y confirma.
+  tiendaStatus?: MassTiendaStatus
+  localizada?: number
+  confirmada?: number
+  motivoFaltante?: string
 }
 
 export interface MassReturn {
   folio: string
   lote: string
+  sku: string
   linea: string
   marca: string
   proveedor: string
   producto: string
   creada: string
   responsable: string
+  /** Instrucciones que Compras envía a las sucursales para el retiro. */
+  instrucciones?: string
+  /** Almacén destino, cuando Compras ya lo definió. */
+  almacenDestino?: string
   subs: MassSub[]
+}
+
+// -------- Seguimiento de devoluciones masivas del lado de Tienda -----------
+// Tienda NO crea masivas ni elige lotes/sucursales: solo atiende la solicitud
+// asignada a su sucursal (localizar, confirmar y marcar lista para envío).
+
+export type MassTiendaStatus =
+  | 'pendiente_atencion'
+  | 'preparacion'
+  | 'info_incompleta'
+  | 'lista_envio'
+  | 'transito'
+  | 'recibida'
+  | 'cerrada'
+
+export const MASS_TIENDA_STATUS: Record<MassTiendaStatus, { label: string; bg: string; text: string; dot: string }> = {
+  pendiente_atencion: { label: 'Pendiente de atención', bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
+  preparacion: { label: 'En preparación', bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-500' },
+  info_incompleta: { label: 'Información incompleta', bg: 'bg-rose-50', text: 'text-rose-700', dot: 'bg-rose-500' },
+  lista_envio: { label: 'Lista para envío', bg: 'bg-violet-50', text: 'text-violet-700', dot: 'bg-violet-500' },
+  transito: { label: 'En tránsito', bg: 'bg-indigo-50', text: 'text-indigo-700', dot: 'bg-indigo-500' },
+  recibida: { label: 'Recibida', bg: 'bg-teal-50', text: 'text-teal-700', dot: 'bg-teal-500' },
+  cerrada: { label: 'Cerrada', bg: 'bg-slate-100', text: 'text-slate-600', dot: 'bg-slate-500' },
+}
+
+/** Próxima acción requerida a Tienda según el estado de la solicitud. */
+export function massTiendaNextAction(s: MassTiendaStatus): string {
+  const map: Record<MassTiendaStatus, string> = {
+    pendiente_atencion: 'Iniciar preparación',
+    preparacion: 'Escanear y confirmar cantidad',
+    info_incompleta: 'Responder solicitud de Compras',
+    lista_envio: 'Esperando recolección',
+    transito: 'En tránsito al almacén destino',
+    recibida: 'Recibida en almacén',
+    cerrada: 'Solicitud concluida',
+  }
+  return map[s]
+}
+
+/** Estado de la solicitud para Tienda (explícito o derivado del estado Compras). */
+export function massTiendaStatusOf(sub: MassSub): MassTiendaStatus {
+  if (sub.tiendaStatus) return sub.tiendaStatus
+  const fallback: Record<StatusKey, MassTiendaStatus> = {
+    nuevo: 'pendiente_atencion',
+    revision: 'preparacion',
+    esperando: 'info_incompleta',
+    autorizado: 'preparacion',
+    rechazado: 'cerrada',
+    pendiente_traslado: 'preparacion',
+    transito: 'transito',
+    recibido: 'recibida',
+    cerrado: 'cerrada',
+  }
+  return fallback[sub.status]
 }
 
 /** Unidades pendientes de una sucursal (solicitado − enviado). */
@@ -1052,12 +1116,15 @@ export const MASS_RETURNS: MassReturn[] = [
   {
     folio: 'DEV-M-2026-0042',
     lote: 'LT-NK-2291',
+    sku: 'NK-AJ1-2291',
     linea: 'Calzado Deportivo',
     marca: 'Nike',
     proveedor: 'Nike México',
     producto: 'Nike Air Jordan 1 Mid — Lote defectuoso',
     creada: '04 jul 2026',
     responsable: 'Fernanda López',
+    instrucciones: 'Retirar todas las piezas del lote de piso de venta y bodega. Verificar SKU y talla antes de empacar. No mezclar con otros modelos.',
+    almacenDestino: '25 · Devolución de fábrica',
     subs: [
       { sucursal: 'Culiacán Centro', solicitado: 12, enviado: 12, recibido: 12, responsableId: 'u1', fechaCompromiso: '06 jul 2026', status: 'recibido', evidencias: [{ url: IMG.boxShoes, label: 'Empaque de envío' }], historial: [ev('05 jul', '09:00', 'Karen Ríos', 'preparó el envío', 'attach'), ev('06 jul', '14:00', 'CEDIS Culiacán', 'recibió 12 uds.', 'receive')] },
       { sucursal: 'Culiacán Forum', solicitado: 8, enviado: 8, recibido: 8, responsableId: 'u1', fechaCompromiso: '06 jul 2026', status: 'recibido', evidencias: [{ url: IMG.boxShoes, label: 'Empaque' }], historial: [ev('06 jul', '15:30', 'CEDIS Culiacán', 'recibió 8 uds.', 'receive')] },
@@ -1070,22 +1137,89 @@ export const MASS_RETURNS: MassReturn[] = [
   {
     folio: 'DEV-M-2026-0041',
     lote: 'LT-AD-1180',
+    sku: 'AD-UB-1180',
     linea: 'Calzado Deportivo',
     marca: 'Adidas',
     proveedor: 'Adidas México',
     producto: 'Adidas Ultraboost Light — Retiro de lote',
     creada: '01 jul 2026',
     responsable: 'Fernanda López',
+    instrucciones: 'Retiro completo del lote por defecto de suela. Empacar en caja rotulada con el folio de la masiva.',
+    almacenDestino: '25 · Devolución de fábrica',
     subs: [
       { sucursal: 'Culiacán Centro', solicitado: 5, enviado: 5, recibido: 5, responsableId: 'u1', fechaCompromiso: '03 jul 2026', status: 'recibido', evidencias: [{ url: IMG.sneakerWhite, label: 'Producto' }], historial: [ev('03 jul', '11:00', 'CEDIS Culiacán', 'recibió 5 uds.', 'receive')] },
       { sucursal: 'Guadalajara Andares', solicitado: 7, enviado: 7, recibido: 7, responsableId: 'u2', fechaCompromiso: '03 jul 2026', status: 'recibido', evidencias: [{ url: IMG.sneakerWhite, label: 'Producto' }], historial: [ev('03 jul', '13:00', 'CEDIS Culiacán', 'recibió 7 uds.', 'receive')] },
       { sucursal: 'Guasave Centro', solicitado: 4, enviado: 4, recibido: 4, responsableId: 'u1', fechaCompromiso: '03 jul 2026', status: 'recibido', evidencias: [], historial: [ev('03 jul', '14:00', 'CEDIS Culiacán', 'recibió 4 uds.', 'receive')] },
     ],
   },
+  {
+    folio: 'DEV-M-2026-0043',
+    lote: 'LT-FX-3390',
+    sku: 'FX-CB-3390',
+    linea: 'Calzado Confort',
+    marca: 'Flexi',
+    proveedor: 'Flexi',
+    producto: 'Flexi Caballero — Retiro por defecto de horma',
+    creada: '15 jul 2026',
+    responsable: 'Óscar Beltrán',
+    instrucciones: 'Localizar todas las piezas del lote en piso y bodega. Confirmar la cantidad encontrada antes de marcar como lista para envío. Si falta mercancía, indicar el motivo y adjuntar evidencia.',
+    almacenDestino: '25 · Devolución de fábrica',
+    subs: [
+      { sucursal: 'Culiacán Centro', solicitado: 8, enviado: 0, recibido: 0, responsableId: 'u1', fechaCompromiso: '18 jul 2026', status: 'nuevo', tiendaStatus: 'pendiente_atencion', evidencias: [], historial: [ev('15 jul', '09:30', 'Óscar Beltrán', 'solicitó el retiro de 8 uds. a esta sucursal', 'create')] },
+      { sucursal: 'Guadalajara Andares', solicitado: 5, enviado: 0, recibido: 0, responsableId: 'u2', fechaCompromiso: '18 jul 2026', status: 'nuevo', tiendaStatus: 'pendiente_atencion', evidencias: [], historial: [ev('15 jul', '09:30', 'Óscar Beltrán', 'solicitó el retiro de 5 uds. a esta sucursal', 'create')] },
+    ],
+  },
+  {
+    folio: 'DEV-M-2026-0044',
+    lote: 'LT-SK-4410',
+    sku: 'SK-GW-4410',
+    linea: 'Calzado Deportivo',
+    marca: 'Skechers',
+    proveedor: 'VF Corp',
+    producto: 'Skechers Go Walk — Retiro por decoloración',
+    creada: '14 jul 2026',
+    responsable: 'Fernanda López',
+    instrucciones: 'Retirar el lote afectado por decoloración. Verificar que el SKU y el lote coincidan con lo solicitado.',
+    almacenDestino: '262 · Venta outlet',
+    subs: [
+      { sucursal: 'Culiacán Centro', solicitado: 7, enviado: 0, recibido: 0, responsableId: 'u1', fechaCompromiso: '17 jul 2026', status: 'nuevo', tiendaStatus: 'preparacion', localizada: 6, evidencias: [], historial: [ev('14 jul', '11:00', 'Fernanda López', 'solicitó el retiro de 7 uds. a esta sucursal', 'create'), ev('16 jul', '10:15', 'Karen Ríos', 'inició la preparación del retiro', 'status')] },
+    ],
+  },
 ]
 
 export function findMassReturn(folio: string): MassReturn | undefined {
   return MASS_RETURNS.find((m) => m.folio === folio)
+}
+
+// -------- Solicitudes masivas asignadas a una sucursal (vista Tienda) -------
+
+export interface SolicitudMasivaTienda {
+  mass: MassReturn
+  sub: MassSub
+  status: MassTiendaStatus
+}
+
+/** Solicitudes de devolución masiva que involucran a una sucursal (Tienda). */
+export function solicitudesMasivasTienda(sucursal: string): SolicitudMasivaTienda[] {
+  const out: SolicitudMasivaTienda[] = []
+  for (const mass of MASS_RETURNS) {
+    const sub = mass.subs.find((s) => s.sucursal === sucursal)
+    if (sub) out.push({ mass, sub, status: massTiendaStatusOf(sub) })
+  }
+  return out
+}
+
+/** Una solicitud masiva concreta para (folio, sucursal). */
+export function findSolicitudMasivaTienda(folio: string, sucursal: string): SolicitudMasivaTienda | undefined {
+  const mass = findMassReturn(folio)
+  if (!mass) return undefined
+  const sub = mass.subs.find((s) => s.sucursal === sucursal)
+  return sub ? { mass, sub, status: massTiendaStatusOf(sub) } : undefined
+}
+
+/** ¿La solicitud sigue activa para Tienda? (no recibida ni cerrada). */
+export function solicitudMasivaActiva(status: MassTiendaStatus): boolean {
+  return status !== 'recibida' && status !== 'cerrada'
 }
 
 // --------------------------- Notificaciones --------------------------------
@@ -1717,7 +1851,7 @@ export function buscarVenta(tipo: 'cliente' | 'ecommerce', folio: string): Busqu
   // devuelve una venta genérica para poder continuar el flujo. Para cliente se
   // incluye una sucursal de compra original; para ecommerce no aplica.
   const venta: Venta = found ?? {
-    folio: q, tipo, cliente: '—', fecha: '28 jun 2026',
+    folio: q, tipo, cliente: 'María Fernanda López Hernández', fecha: '28 jun 2026',
     sucursalCompra: tipo === 'cliente' ? SUCURSALES[0] : undefined,
     productos: VENTA_DEFAULT_PRODUCTOS,
   }

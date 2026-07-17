@@ -7,6 +7,8 @@ import NewReturn from './pages/NewReturn'
 import MyPending from './pages/MyPending'
 import MassReturns from './pages/MassReturns'
 import MassReturnDetail from './pages/MassReturnDetail'
+import MassReturnsTienda from './pages/MassReturnsTienda'
+import MassReturnTiendaDetail from './pages/MassReturnTiendaDetail'
 import Reports from './pages/Reports'
 import Catalogs from './pages/Catalogs'
 import Settings from './pages/Settings'
@@ -36,6 +38,8 @@ export default function App() {
         <Route path="/pendientes" element={<Guard nav="pendientes"><MyPending /></Guard>} />
         <Route path="/masivas" element={<Guard nav="masivas"><MassReturns /></Guard>} />
         <Route path="/masivas/:folio" element={<Guard nav="masivas"><MassReturnDetail /></Guard>} />
+        <Route path="/masivas-tienda" element={<MassReturnsTienda />} />
+        <Route path="/masivas-tienda/:folio" element={<MassReturnTiendaDetail />} />
         <Route path="/incidencias" element={<Guard nav="incidencias"><Incidencias /></Guard>} />
         <Route path="/incidencias/nueva" element={<Guard nav="nueva_incidencia"><NewIncidencia /></Guard>} />
         <Route path="/incidencias/:folio" element={<Guard nav="incidencias"><IncidenciaDetail /></Guard>} />

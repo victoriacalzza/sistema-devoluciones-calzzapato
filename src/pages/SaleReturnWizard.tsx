@@ -219,7 +219,7 @@ export default function SaleReturnWizard({ type, allowMultipleTypes, onChangeTyp
   const sucursalLabel = isEcom ? 'Sucursal donde se realiza el cambio físico' : 'Sucursal donde se realiza el cambio'
 
   const stepValid: Record<number, boolean> = {
-    1: !!busq?.existe && !busq?.devolucionActiva && !!cliente.trim() && !!sucursal,
+    1: !!busq?.existe && !busq?.devolucionActiva && !!sucursal && (isEcom || !!cliente.trim()),
     2: !!selSku,
     3: !!motivo,
     4: fotos >= 1 && !uploading && !!smsAuth,
@@ -247,7 +247,7 @@ export default function SaleReturnWizard({ type, allowMultipleTypes, onChangeTyp
               <div><span className="text-slate-500">Folio:</span> <span className="font-mono font-semibold text-slate-800">DEV-2026-000155</span></div>
               <div><span className="text-slate-500">Tipo:</span> <span className="font-medium text-slate-800">{RETURN_TYPES[type].short}</span></div>
               <div><span className="text-slate-500">{folioLabel}:</span> <span className="font-mono font-medium text-slate-800">{folio}</span></div>
-              <div><span className="text-slate-500">Cliente:</span> <span className="font-medium text-slate-800">{cliente}</span></div>
+              <div><span className="text-slate-500">Cliente:</span> <span className="font-medium text-slate-800">{isEcom ? venta?.cliente : cliente}</span></div>
               <div className="sm:col-span-2"><span className="text-slate-500">Producto:</span> <span className="font-medium text-slate-800">{selProd?.descripcion}</span></div>
               <div><span className="text-slate-500">Motivo:</span> <span className="font-medium text-slate-800">{motivo}</span></div>
               <div><span className="text-slate-500">Sucursal:</span> <span className="font-medium text-slate-800">{sucursal}</span></div>
@@ -304,11 +304,14 @@ export default function SaleReturnWizard({ type, allowMultipleTypes, onChangeTyp
                 </div>
                 <Hint>Ejemplo: {isEcom ? 'EC-99210' : 'FA-CUL-88231'}</Hint>
               </label>
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">Nombre del cliente<span className="ml-0.5 text-brand-600">*</span></span>
-                <input className={inputCls} placeholder="Nombre del cliente" value={cliente} onChange={(e) => setCliente(e.target.value)} />
-                <Hint>Ejemplo: María Fernanda López Hernández</Hint>
-              </label>
+              {/* Ecommerce: el nombre del cliente se obtiene del pedido, no se captura. */}
+              {!isEcom && (
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-medium text-slate-700">Nombre del cliente<span className="ml-0.5 text-brand-600">*</span></span>
+                  <input className={inputCls} placeholder="Nombre del cliente" value={cliente} onChange={(e) => setCliente(e.target.value)} />
+                  <Hint>Ejemplo: María Fernanda López Hernández</Hint>
+                </label>
+              )}
               <label className="block">
                 <span className="mb-1.5 block text-sm font-medium text-slate-700">{sucursalLabel}<span className="ml-0.5 text-brand-600">*</span></span>
                 <select className={inputCls} value={sucursal} onChange={(e) => setSucursal(e.target.value)}>
@@ -335,6 +338,7 @@ export default function SaleReturnWizard({ type, allowMultipleTypes, onChangeTyp
                 <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 rounded-lg border border-emerald-100 bg-white/70 p-3 text-xs sm:grid-cols-2">
                   <div className="flex justify-between gap-2"><span className="text-slate-500">Cliente</span><span className="font-medium text-slate-700">{busq.venta.cliente}</span></div>
                   <div className="flex justify-between gap-2"><span className="text-slate-500">Fecha de compra</span><span className="font-medium text-slate-700">{busq.venta.fecha}</span></div>
+                  <div className="flex justify-between gap-2"><span className="text-slate-500">Productos encontrados</span><span className="font-medium text-slate-700">{busq.venta.productos.length}</span></div>
                   {!isEcom && busq.venta.sucursalCompra && (
                     <div className="flex justify-between gap-2 sm:col-span-2">
                       <span className="text-slate-500">Sucursal de compra original</span>
