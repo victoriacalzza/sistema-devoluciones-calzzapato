@@ -591,6 +591,8 @@ export interface ReturnCase {
    */
   bloqueadoEcommerce?: boolean
   ventaFisica?: boolean
+  /** Destino comercial del producto al rechazar: Remate · Promoción · Venta física regular. */
+  destinoComercial?: string
   /** Resolución textual registrada al rechazar y determinar el destino del producto. */
   resolucionRechazo?: string
 }
