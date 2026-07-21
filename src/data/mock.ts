@@ -1727,10 +1727,15 @@ export interface TrasladoProducto {
 }
 
 export interface Traslado {
+  /** Folio de envío de la redistribución (el que captura Ecommerce). */
   folioRedistribucion: string
   idTraslado: string
   idVenta: string
   sucursalOrigen: string
+  /** Sucursal/almacén al que se envió la mercancía. */
+  sucursalDestino: string
+  /** Estado del envío de redistribución. */
+  estado: string
   fecha: string
   productos: TrasladoProducto[]
 }
@@ -1741,6 +1746,8 @@ export const TRASLADOS: Traslado[] = [
     idTraslado: 'TR-45012',
     idVenta: 'EC-99210',
     sucursalOrigen: 'Culiacán Centro',
+    sucursalDestino: 'Almacén Ecommerce',
+    estado: 'Recibido en almacén Ecommerce',
     fecha: '12 jul 2026',
     productos: [
       { sku: 'NK-AJ1-2291', descripcion: 'Tenis Nike Air Jordan 1 Mid — Negro/Rojo', marca: 'Nike', proveedor: 'Nike México', lote: 'LT-NK-2291', talla: '27 MX', color: 'Negro / Rojo', image: IMG.sneakerRed },
@@ -1753,6 +1760,8 @@ export const TRASLADOS: Traslado[] = [
     idTraslado: 'TR-44980',
     idVenta: 'EC-99120',
     sucursalOrigen: 'Guadalajara Andares',
+    sucursalDestino: 'Almacén Ecommerce',
+    estado: 'Recibido en almacén Ecommerce',
     fecha: '10 jul 2026',
     productos: [
       { sku: 'SK-GW-4410', descripcion: 'Skechers Go Walk — Azul marino', marca: 'Skechers', proveedor: 'VF Corp', lote: 'LT-SK-4410', talla: '27 MX', color: 'Azul marino', image: IMG.sneakerWhite },
@@ -1777,6 +1786,16 @@ export function buscarTraslado(q: { idVenta?: string; idTraslado?: string; folio
   if (found) return found
   if (anyInput) return TRASLADOS[0]
   return undefined
+}
+
+/**
+ * Busca un envío de redistribución por su folio (RD-… o TR-…). En el prototipo,
+ * cualquier folio no vacío devuelve un envío para poder continuar el flujo.
+ */
+export function buscarEnvio(folio: string): Traslado | undefined {
+  const q = folio.trim()
+  if (!q) return undefined
+  return buscarTraslado({ folioRedistribucion: q, idTraslado: q })
 }
 
 // ------------------- Ventas / facturas (wizard Tienda) ---------------------

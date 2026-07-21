@@ -11,16 +11,17 @@ import {
   Play,
   X,
   CheckCircle2,
-  ShoppingBag,
+  Truck,
   Package,
   Building2,
 } from 'lucide-react'
 import { PageHeader } from '../components/AppLayout'
 import { Card, Button, BackLink, cn } from '../lib/ui'
 import {
-  buscarTraslado,
-  SUCURSALES_ORIGEN,
+  buscarEnvio,
   GERENTES,
+  MOTIVOS_INCIDENCIA_WIZARD,
+  compradorForMarca,
   type Traslado,
   type TrasladoProducto,
 } from '../data/mock'
@@ -68,7 +69,7 @@ function resumenEvidencia(fotos: number, videos: number): string {
 }
 
 const STEPS = [
-  { n: 1, title: 'Identificar venta' },
+  { n: 1, title: 'Identificar envío' },
   { n: 2, title: 'Seleccionar producto' },
   { n: 3, title: 'Información de la incidencia' },
   { n: 4, title: 'Adjuntar evidencia' },
@@ -81,18 +82,18 @@ export default function NewIncidencia() {
   const [step, setStep] = useState(1)
   const [done, setDone] = useState(false)
 
-  // Paso 1 — ID Venta
-  const [idVenta, setIdVenta] = useState('')
-  const [traslado, setTraslado] = useState<Traslado | null>(null)
+  // Paso 1 — Folio de envío (redistribución)
+  const [folioEnvio, setFolioEnvio] = useState('')
+  const [envio, setEnvio] = useState<Traslado | null>(null)
   const [buscado, setBuscado] = useState(false)
 
   // Paso 2 — producto afectado
   const [selSku, setSelSku] = useState('')
 
-  // Paso 3 — información obligatoria
-  const [lote, setLote] = useState('')
-  const [sucursalOrigen, setSucursalOrigen] = useState('')
+  // Paso 3 — información de la incidencia
+  const [tipoIncidencia, setTipoIncidencia] = useState('')
   const [gerente, setGerente] = useState('')
+  const [descripcion, setDescripcion] = useState('')
 
   // Paso 4 — evidencia multimedia
   const [files, setFiles] = useState<EvidenceFile[]>([])
@@ -106,11 +107,12 @@ export default function NewIncidencia() {
     return () => { Object.values(active).forEach((t) => clearInterval(t)) }
   }, [])
 
-  const selProd: TrasladoProducto | undefined = traslado?.productos.find((p) => p.sku === selSku)
+  const selProd: TrasladoProducto | undefined = envio?.productos.find((p) => p.sku === selSku)
+  const comprador = selProd ? compradorForMarca(selProd.marca)?.comprador : undefined
 
   function buscar() {
-    const t = buscarTraslado({ idVenta })
-    setTraslado(t ?? null)
+    const e = buscarEnvio(folioEnvio)
+    setEnvio(e ?? null)
     setSelSku('')
     setBuscado(true)
   }
@@ -193,17 +195,17 @@ export default function NewIncidencia() {
 
   // Validación por paso
   const stepValid: Record<number, boolean> = {
-    1: !!traslado,
+    1: !!envio,
     2: !!selSku,
-    3: !!lote.trim() && !!sucursalOrigen && !!gerente.trim(),
+    3: !!tipoIncidencia && !!gerente.trim(),
     4: readyFiles.length > 0 && !uploading,
   }
 
   function resetAll() {
     files.forEach((f) => URL.revokeObjectURL(f.url))
     setStep(1); setDone(false)
-    setIdVenta(''); setTraslado(null); setBuscado(false)
-    setSelSku(''); setLote(''); setSucursalOrigen(''); setGerente('')
+    setFolioEnvio(''); setEnvio(null); setBuscado(false)
+    setSelSku(''); setTipoIncidencia(''); setGerente(''); setDescripcion('')
     setFiles([]); setFileErrors([])
   }
 
@@ -215,18 +217,20 @@ export default function NewIncidencia() {
           <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600"><CheckCircle2 className="h-8 w-8" /></span>
           <h2 className="text-lg font-semibold text-slate-900">Incidencia registrada</h2>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-500" /> Incidencia abierta
+            <span className="h-1.5 w-1.5 rounded-full bg-blue-500" /> Pendiente de revisión por Compras
           </span>
           <div className="mt-2 w-full max-w-md rounded-xl border border-slate-100 bg-slate-50/60 p-4 text-left text-sm">
             <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
               <div><span className="text-slate-500">Folio:</span> <span className="font-mono font-semibold text-slate-800">INC-EC-2026-0008</span></div>
               <div><span className="text-slate-500">Fecha y hora:</span> <span className="font-medium text-slate-800">15 jul 2026 · ahora</span></div>
               <div className="sm:col-span-2"><span className="text-slate-500">Operador Ecommerce:</span> <span className="font-medium text-slate-800">{user.name}</span></div>
-              <div><span className="text-slate-500">ID Venta:</span> <span className="font-mono font-medium text-slate-800">{idVenta}</span></div>
+              <div><span className="text-slate-500">Folio de envío:</span> <span className="font-mono font-medium text-slate-800">{envio?.folioRedistribucion}</span></div>
+              <div><span className="text-slate-500">Tipo de incidencia:</span> <span className="font-medium text-slate-800">{tipoIncidencia}</span></div>
               <div><span className="text-slate-500">Producto:</span> <span className="font-medium text-slate-800">{selProd?.descripcion}</span></div>
-              <div><span className="text-slate-500">Lote:</span> <span className="font-mono font-medium text-slate-800">{lote}</span></div>
-              <div><span className="text-slate-500">Sucursal origen:</span> <span className="font-medium text-slate-800">{sucursalOrigen}</span></div>
+              <div><span className="text-slate-500">Lote:</span> <span className="font-mono font-medium text-slate-800">{selProd?.lote}</span></div>
+              <div><span className="text-slate-500">Sucursal origen:</span> <span className="font-medium text-slate-800">{envio?.sucursalOrigen}</span></div>
               <div><span className="text-slate-500">Gerente origen:</span> <span className="font-medium text-slate-800">{gerente}</span></div>
+              <div className="sm:col-span-2"><span className="text-slate-500">Asignada a (comprador):</span> <span className="font-medium text-slate-800">{comprador?.name ?? '—'}</span></div>
               <div className="sm:col-span-2"><span className="text-slate-500">Evidencias:</span> <span className="font-medium text-slate-800">{resumenEvidencia(fotos, videos)}</span></div>
             </div>
           </div>
@@ -263,42 +267,51 @@ export default function NewIncidencia() {
       </div>
 
       <Card className="space-y-5">
-        {/* PASO 1 — Identificar venta */}
+        {/* PASO 1 — Identificar envío */}
         {step === 1 && (
           <>
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-700"><ShoppingBag className="h-4 w-4 text-slate-500" /> Identificar venta</div>
-            <p className="text-sm text-slate-500">Captura el <span className="font-medium text-slate-700">ID Venta</span>. El sistema buscará automáticamente los productos relacionados con esa venta.</p>
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-700"><Truck className="h-4 w-4 text-slate-500" /> Identificar envío</div>
+            <p className="text-sm text-slate-500">Captura el <span className="font-medium text-slate-700">Folio de envío</span> de la redistribución. El sistema localizará automáticamente el envío y mostrará todos los productos incluidos en ese traslado.</p>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
               <label className="block flex-1">
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">ID Venta<span className="ml-0.5 text-brand-600">*</span></span>
-                <input className={inputCls} placeholder="EC-99210" value={idVenta} onChange={(e) => setIdVenta(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') buscar() }} />
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">Folio de envío<span className="ml-0.5 text-brand-600">*</span></span>
+                <input className={inputCls} placeholder="RD-2026-0091" value={folioEnvio} onChange={(e) => setFolioEnvio(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') buscar() }} />
               </label>
-              <Button variant="secondary" icon={<Search className="h-4 w-4" />} disabled={!idVenta.trim()} onClick={buscar}>Buscar productos</Button>
+              <Button variant="secondary" icon={<Search className="h-4 w-4" />} disabled={!folioEnvio.trim()} onClick={buscar}>Buscar envío</Button>
             </div>
 
-            {buscado && traslado && (
+            {buscado && envio && (
               <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4">
-                <div className="flex items-center gap-1.5 text-sm font-medium text-emerald-800"><Check className="h-4 w-4" /> {traslado.productos.length} producto(s) encontrados para esta venta</div>
+                <div className="flex items-center gap-1.5 text-sm font-medium text-emerald-800"><Check className="h-4 w-4" /> Envío localizado · {envio.productos.length} producto(s) en el traslado</div>
+                {/* Datos del envío obtenidos automáticamente */}
+                <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 rounded-lg border border-emerald-100 bg-white/70 p-3 text-xs sm:grid-cols-2">
+                  <div className="flex justify-between gap-2"><span className="text-slate-500">Folio de envío</span><span className="font-mono font-medium text-slate-700">{envio.folioRedistribucion}</span></div>
+                  <div className="flex justify-between gap-2"><span className="text-slate-500">Fecha del envío</span><span className="font-medium text-slate-700">{envio.fecha}</span></div>
+                  <div className="flex justify-between gap-2"><span className="text-slate-500">Sucursal de origen</span><span className="font-medium text-slate-700">{envio.sucursalOrigen}</span></div>
+                  <div className="flex justify-between gap-2"><span className="text-slate-500">Sucursal de destino</span><span className="font-medium text-slate-700">{envio.sucursalDestino}</span></div>
+                  <div className="flex justify-between gap-2"><span className="text-slate-500">Estado del envío</span><span className="font-medium text-slate-700">{envio.estado}</span></div>
+                  <div className="flex justify-between gap-2"><span className="text-slate-500">Total de productos enviados</span><span className="font-medium text-slate-700">{envio.productos.length}</span></div>
+                </div>
                 <ul className="mt-2 space-y-1 text-xs text-slate-600">
-                  {traslado.productos.map((p) => (
+                  {envio.productos.map((p) => (
                     <li key={p.sku} className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-slate-300" />{p.descripcion} <span className="font-mono text-slate-400">· {p.sku}</span></li>
                   ))}
                 </ul>
               </div>
             )}
-            {buscado && !traslado && (
-              <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">No se encontraron productos para ese ID Venta.</div>
+            {buscado && !envio && (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">No se encontró un envío de redistribución con ese folio.</div>
             )}
           </>
         )}
 
         {/* PASO 2 — Seleccionar producto */}
-        {step === 2 && traslado && (
+        {step === 2 && envio && (
           <>
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700"><Package className="h-4 w-4 text-slate-500" /> Seleccionar producto afectado</div>
-            <p className="text-sm text-slate-500">Selecciona el producto que llegó en mal estado o con alguna anomalía.</p>
+            <p className="text-sm text-slate-500">Selecciona cuál de los productos del envío presentó la incidencia (llegó en mal estado o con alguna anomalía).</p>
             <div className="space-y-2">
-              {traslado.productos.map((p) => (
+              {envio.productos.map((p) => (
                 <button
                   key={p.sku}
                   onClick={() => setSelSku(p.sku)}
@@ -307,8 +320,8 @@ export default function NewIncidencia() {
                   <img src={p.image} alt="" className="h-16 w-16 shrink-0 rounded-lg object-cover" />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium text-slate-900">{p.descripcion}</div>
-                    <div className="truncate font-mono text-[11px] text-slate-500">{p.sku}</div>
-                    {(p.talla || p.color) && <div className="mt-0.5 text-xs text-slate-500">Talla {p.talla} · {p.color}</div>}
+                    <div className="truncate font-mono text-[11px] text-slate-500">{p.sku} · {p.marca}</div>
+                    {(p.talla || p.color) && <div className="mt-0.5 text-xs text-slate-500">Talla {p.talla} · {p.color} · Lote {p.lote}</div>}
                   </div>
                   {selSku === p.sku && <Check className="h-5 w-5 shrink-0 text-brand-600" />}
                 </button>
@@ -318,29 +331,34 @@ export default function NewIncidencia() {
         )}
 
         {/* PASO 3 — Información de la incidencia */}
-        {step === 3 && selProd && (
+        {step === 3 && selProd && envio && (
           <>
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700"><Building2 className="h-4 w-4 text-slate-500" /> Información de la incidencia</div>
+            {/* Datos del producto y del envío — automáticos, solo lectura */}
             <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
               <img src={selProd.image} alt="" className="h-14 w-14 rounded-lg object-cover" />
-              <div><div className="text-sm font-medium text-slate-900">{selProd.descripcion}</div><div className="font-mono text-xs text-slate-500">{selProd.sku}</div></div>
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-slate-900">{selProd.descripcion}</div>
+                <div className="font-mono text-xs text-slate-500">{selProd.sku} · {selProd.marca}{selProd.linea ? ` · ${selProd.linea}` : ''}</div>
+                <div className="mt-0.5 text-xs text-slate-500">Talla {selProd.talla} · {selProd.color} · Lote {selProd.lote} · Origen {envio.sucursalOrigen}</div>
+              </div>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">Lote<span className="ml-0.5 text-brand-600">*</span></span>
-                <input className={inputCls} placeholder="LT-AD-1180" value={lote} onChange={(e) => setLote(e.target.value)} />
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">Sucursal de origen<span className="ml-0.5 text-brand-600">*</span></span>
-                <select className={inputCls} value={sucursalOrigen} onChange={(e) => setSucursalOrigen(e.target.value)}>
-                  <option value="">Selecciona una sucursal…</option>
-                  {SUCURSALES_ORIGEN.map((s) => <option key={s} value={s}>{s}</option>)}
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">Tipo de incidencia<span className="ml-0.5 text-brand-600">*</span></span>
+                <select className={inputCls} value={tipoIncidencia} onChange={(e) => setTipoIncidencia(e.target.value)}>
+                  <option value="">Selecciona un tipo…</option>
+                  {MOTIVOS_INCIDENCIA_WIZARD.map((m) => <option key={m} value={m}>{m}</option>)}
                 </select>
               </label>
-              <label className="block sm:col-span-2">
+              <label className="block">
                 <span className="mb-1.5 block text-sm font-medium text-slate-700">Nombre del gerente de la sucursal origen<span className="ml-0.5 text-brand-600">*</span></span>
                 <input className={inputCls} list="gerentes-origen" placeholder="Nombre del gerente" value={gerente} onChange={(e) => setGerente(e.target.value)} />
                 <datalist id="gerentes-origen">{GERENTES.map((g) => <option key={g} value={g} />)}</datalist>
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">Descripción <span className="text-slate-400">(opcional)</span></span>
+                <textarea rows={3} className={inputCls} placeholder="Detalle adicional de la anomalía detectada…" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
               </label>
             </div>
           </>
