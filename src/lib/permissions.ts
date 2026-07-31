@@ -98,8 +98,9 @@ const NAV_BY_ROLE: Record<RoleKey, NavKey[]> = {
   // Ecommerce: NO crea devoluciones. Da seguimiento a devoluciones Ecommerce,
   // gestiona incidencias de redistribución, ve productos bloqueados y reportes.
   ecommerce: ['dashboard', 'pendientes_resolucion', 'incidencias', 'nueva_incidencia', 'devoluciones', 'bloqueados', 'reportes_ecommerce'],
-  // Compras: interfaz corporativa completa. "configuracion" es solo para Administrador.
-  compras: ['dashboard', 'devoluciones', 'nueva', 'pendientes', 'masivas', 'reportes', 'catalogos', 'configuracion'],
+  // Compras: interfaz corporativa. "configuracion" solo la ve el Administrador (ADMIN_ONLY).
+  // Catálogos es operativo compartido (Compras + Administrador); Configuración es exclusivo del Administrador.
+  compras: ['dashboard', 'devoluciones', 'pendientes', 'masivas', 'reportes', 'catalogos', 'configuracion'],
 }
 
 /** Módulos que solo el subrol Administrador (dentro de Compras) puede ver. */

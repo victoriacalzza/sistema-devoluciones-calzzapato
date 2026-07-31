@@ -10,8 +10,10 @@ import MassReturnDetail from './pages/MassReturnDetail'
 import MassReturnsTienda from './pages/MassReturnsTienda'
 import MassReturnTiendaDetail from './pages/MassReturnTiendaDetail'
 import Reports from './pages/Reports'
-import Catalogs from './pages/Catalogs'
+import CatalogosAdmin from './pages/config/CatalogosAdmin'
 import Settings from './pages/Settings'
+import RolePermissions from './pages/RolePermissions'
+import AdminModule from './pages/AdminModule'
 import Incidencias from './pages/Incidencias'
 import NewIncidencia from './pages/NewIncidencia'
 import IncidenciaDetail from './pages/IncidenciaDetail'
@@ -47,8 +49,10 @@ export default function App() {
         <Route path="/pendientes-resolucion" element={<Guard nav="pendientes_resolucion"><PendingResolution /></Guard>} />
         <Route path="/reportes-ecommerce" element={<Guard nav="reportes_ecommerce"><ReportsEcommerce /></Guard>} />
         <Route path="/reportes" element={<Guard nav="reportes"><Reports /></Guard>} />
-        <Route path="/catalogos" element={<Guard nav="catalogos"><Catalogs /></Guard>} />
+        <Route path="/catalogos" element={<Guard nav="catalogos"><div className="mx-auto max-w-[1100px] px-4 py-6 lg:px-8"><CatalogosAdmin /></div></Guard>} />
         <Route path="/configuracion" element={<Guard nav="configuracion"><Settings /></Guard>} />
+        <Route path="/configuracion/rol/:role" element={<Guard nav="configuracion"><RolePermissions /></Guard>} />
+        <Route path="/configuracion/modulo/:key" element={<Guard nav="configuracion"><AdminModule /></Guard>} />
       </Routes>
     </AppLayout>
   )
